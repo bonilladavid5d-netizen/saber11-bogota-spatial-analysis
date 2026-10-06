@@ -1,0 +1,281 @@
+EJECUCION v4.1 — 2026-10-05 22:56:31
+R 4.4.0 | Darwin 25.2.0 arm64
+
+$ bash run_analisis.sh
+== Comprobacion de insumos ==
+  18 TXT, catalogo de sedes, capas UPZ/UPL completas (.shp/.dbf/.shx/.prj),
+  base legacy y tablas originales: presentes
+
+== 01 Reconstruccion ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+[22:56:32] Etapa 0: manifiesto de insumos
+[22:56:32] Espacio libre: 41.3 GB
+[22:56:51] Manifiesto: 19 insumos con SHA-256
+[22:56:51] Etapa 1: lectura por periodo
+[22:56:51]   Examen_Saber_11_20202.txt
+[22:57:05]   Examen_Saber_11_20211.txt
+[22:57:06]   Examen_Saber_11_20212.txt
+[22:57:20]   Examen_Saber_11_20221.txt
+[22:57:21]   Examen_Saber_11_20222.txt
+[22:57:34]   Examen_Saber_11_20231.txt
+[22:57:36]   Examen_Saber_11_20232.txt
+[22:57:48]   Examen_Saber_11_20241.txt
+[22:57:50]   Examen_Saber_11_20242.txt
+[22:58:02]   Examen_Saber_11_20161.txt
+[22:58:03]   Examen_Saber_11_20162.txt
+[22:58:14]   Examen_Saber_11_20171.txt
+[22:58:16]   Examen_Saber_11_20172.txt
+[22:58:36]   Examen_Saber_11_20181.txt
+[22:58:38]   Examen_Saber_11_20182.txt
+[22:58:53]   Examen_Saber_11_20191.txt
+[22:58:54]   Examen_Saber_11_20192.txt
+[22:59:09]   Examen_Saber_11_20201.txt
+           used  (Mb) gc trigger  (Mb) limit (Mb)  max used  (Mb)
+Ncells  2505813 133.9    5970645 318.9         NA   3498488 186.9
+Vcells 45922406 350.4  104722905 799.0      16384 104683243 798.7
+[22:59:11] Bogota acumulado: 791,073 filas
+[22:59:11] Etapa 2: catalogo de sedes 2025
+Warning message:
+st_crs<- : replacing crs does not reproject data; use st_transform for that 
+[22:59:11]   filas: 2221 | sedes: 2221 | establecimientos: 1871 | plausibles: 2219 | ambiguos: 0
+[22:59:11] Etapa 3: union con el catalogo
+[22:59:12] Etapa 4: estados del cruce
+[22:59:13]   sedes sin match: 166 | con candidato por nombre: 2
+[22:59:13] Etapa 5: conflictos y casos sin match
+[22:59:14] Etapa 7: comparacion agregada con legacy
+            used  (Mb) gc trigger   (Mb) limit (Mb)  max used  (Mb)
+Ncells   2577098 137.7    5970645  318.9         NA   4166772 222.6
+Vcells 101302516 772.9  150976983 1151.9      16384 125404042 956.8
+[22:59:17]   Comparacion agregada sobre 11706 combinaciones periodo x sede.
+[22:59:17] Etapa 8: escritura de resultados
+[22:59:22]   base privada: 791,073 filas x 66 columnas
+[22:59:41] Fin. Bogota total: 791,073 | muestra principal: 770,319 | insumos intactos: TRUE
+
+== 02 Validacion de la Fase 1 ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 15 PASS, 0 FAIL, 1 otros -> CONDITIONAL PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (287.6 KB)
+
+== 03 Validacion directa del parquet ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+Validacion directa del parquet
+
+23 PASS, 0 FAIL, 0 REVIEW sobre 23 pruebas
+Validacion directa del parquet superada. Huella registrada: e1e0c3dae4ba739f 
+
+== 04 Analisis espacial ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+6: package ‘spdep’ was built under R version 4.4.1 
+7: package ‘spData’ was built under R version 4.4.1 
+8: package ‘ggplot2’ was built under R version 4.4.3 
+[23:00:40] Cargando muestra principal
+[23:00:44]   registros en muestra principal: 770,319
+[23:00:46]   sedes en el pooled: 1224 | sede-periodo: 11002
+[23:00:46] Moran global, pooled y por periodo
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+There were 45 warnings (use warnings() to see them)
+[23:00:50]   pooled I = 0.3416 (n = 1224, p_perm = 0.001)
+[23:00:50] LISA sobre el pooled
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+[23:00:50] Comprobaciones dirigidas
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+4: In knearneigh(xy, k = k) : knearneigh: identical points found
+5: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+6: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+7: In knearneigh(xy, k = k) : knearneigh: identical points found
+8: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+9: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knearneigh(xy, k = k) : knearneigh: identical points found
+4: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+5: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 2 sub-graphs
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 2 sub-graphs
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 12 sub-graphs
+4: In knearneigh(xy, k = k) : knearneigh: identical points found
+5: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+6: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 2 sub-graphs
+7: In knearneigh(xy, k = k) : knearneigh: identical points found
+8: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+[23:00:55] Cobertura legacy vs corregido
+[23:00:55] Asignacion territorial
+Warning messages:
+1: In knearneigh(xy, k = k) : knearneigh: identical points found
+2: In knearneigh(xy, k = k) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(xy, k = k)) : neighbour object has 4 sub-graphs
+[23:00:55] Comparacion con el analisis original
+[23:00:55] Figuras
+[23:00:57] Analisis completo. Tablas en outputs/portafolio/tablas y figuras en outputs/portafolio/figuras
+
+== 05 Modelos ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+6: package ‘spdep’ was built under R version 4.4.1 
+7: package ‘spData’ was built under R version 4.4.1 
+8: package ‘spatialreg’ was built under R version 4.4.3 
+9: package ‘ggplot2’ was built under R version 4.4.3 
+[23:00:59] Construyendo panel sede-ano
+[23:01:08]   panel: 10228 obs sede-ano (8 descartadas por covariable faltante), 1224 sedes, 9 anos
+[23:01:08] Matriz de pesos en bloques (k = 5)
+There were 29 warnings (use warnings() to see them)
+[23:01:11] Modelo de referencia: MCO
+[23:01:11] Pruebas de multiplicadores de Lagrange sobre los residuos de MCO
+[23:01:12] SAR (rezago de y)
+[23:01:15] SEM (error espacial)
+[23:01:18] SDM (principal)
+[23:01:22]   rho SDM = 0.0609 | LL = -4498.5
+[23:01:22] Comparacion de especificaciones
+[23:01:22] Impactos del SDM (R = 1000)
+[23:01:27]   impactos calculados para 7 covariables
+[23:01:27] Diagnosticos
+[23:01:28] Comprobaciones dirigidas sobre el SDM
+There were 50 or more warnings (use warnings() to see the first 50)
+[23:02:33] Figuras de modelos
+[23:02:34] Modelos completos. Tablas 10-18 en outputs/portafolio/tablas
+
+== 06 Exportacion para Shiny ==
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+6: package ‘spdep’ was built under R version 4.4.1 
+7: package ‘spData’ was built under R version 4.4.1 
+[23:02:36] Reconstruyendo agregados de sede
+Warning messages:
+1: In knearneigh(st_coordinates(pts), k = K_VECINOS) :
+  knearneigh: identical points found
+2: In knearneigh(st_coordinates(pts), k = K_VECINOS) :
+  knearneigh: kd_tree not available for identical points
+3: In knn2nb(knearneigh(st_coordinates(pts), k = K_VECINOS)) :
+  neighbour object has 4 sub-graphs
+[23:02:41]   1224 sedes | 12 con media suprimida por tener menos de 10 examenes
+[23:02:41] Exportacion lista en shiny_corregido/data
+
+== Cadena completa sin fallos ==
+codigo de salida = 0
+
+$ Rscript shiny_corregido/test_app.R
+Warning message:
+package ‘shiny’ was built under R version 4.4.3 
+
+Attaching package: ‘bslib’
+
+The following object is masked from ‘package:utils’:
+
+    page
+
+Linking to GEOS 3.13.0, GDAL 3.8.5, PROJ 9.5.1; sf_use_s2() is TRUE
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:shiny’:
+
+    validate
+
+  [OK] filtro base devuelve todas las sedes (1224)
+  [OK] filtro HH devuelve 120 sedes y coincide con la tabla LISA
+  [OK] excluir conflicto quita 26 sedes (1224 -> 1198)
+  [OK] umbral de presentaciones filtra (556 sedes)
+  [OK] filtro por UPL devuelve 33 sedes
+  [OK] combinacion de filtros deja seleccion vacia (0 sedes)
+  [OK] resumen del mapa no falla con seleccion vacia
+  [OK] tabla LISA no falla con seleccion vacia
+  [OK] resumen del mapa renderiza
+  [OK] tabla LISA renderiza
+  [OK] mapa leaflet renderiza
+  [OK] grafico de evolucion renderiza
+  [OK] grafico de Moran renderiza
+  [OK] evolucion filtrada a primer semestre
+  [OK] evolucion filtrada a segundo semestre
+  [OK] evolucion con ambas aplicaciones
+  [OK] texto del modelo renderiza
+  [OK] grafico de impactos renderiza
+  [OK] tabla de modelos renderiza
+  [OK] tabla de robustez renderiza
+  [OK] limitaciones renderizan
+  [OK] diagnosticos renderizan
+  [OK] tabla territorial renderiza
+  [OK] procedencia renderiza
+There were 28 warnings (use warnings() to see them)
+
+24 comprobaciones OK, 0 fallos
+codigo de salida = 0

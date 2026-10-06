@@ -1,0 +1,36 @@
+{
+  "fase": "1",
+  "inicio": "2026-10-05 22:56:32",
+  "fin": "2026-10-05 22:59:41",
+  "duracion_min": 3.14,
+  "r_version": "R version 4.4.0 (2024-04-24)",
+  "paquetes": ["2.1.6", "1.2.0", "23.0.1.1", "1.1.0", "0.6.35"],
+  "n_archivos": 18,
+  "filas_nacionales_no_faltantes": 5982829,
+  "filas_bogota_total": 791073,
+  "filas_bogota_punt_valido": 791073,
+  "filas_muestra_principal": 770319,
+  "crs_declarado_gpkg": "WGS 84 / Pseudo-Mercator",
+  "crs_aplicado": "EPSG:4326 via st_set_crs",
+  "evidencia_crs": "lon [-74.3933, -74.0162] lat [3.8295, 4.8239] sobre 2219 de 2221 filas con coordenada finita",
+  "insumos_intactos": true,
+  "legacy_nota": "Comparacion agregada sobre 11706 combinaciones periodo x sede.",
+  "digest_agregados": "a7340f85531830b2104c490f026a4e87321598c6277d9ba5c04e37900505f599",
+  "digest_corrida_anterior": "a7340f85531830b2104c490f026a4e87321598c6277d9ba5c04e37900505f599",
+  "cardinalidad": [
+    {
+      "etapa": "antes_union",
+      "filas": 791073,
+      "llaves_unicas": 791073,
+      "duplicados": 0
+    },
+    {
+      "etapa": "despues_union",
+      "filas": 791073,
+      "llaves_unicas": 791073,
+      "duplicados": 0,
+      "sin_coincidencia": 20754,
+      "multiplicados": 0
+    }
+  ]
+}

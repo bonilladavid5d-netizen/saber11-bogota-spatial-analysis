@@ -1,0 +1,5 @@
+modelo,tipo,n,k,logLik,AIC,rho,rho_p,lambda,lambda_p
+MCO (referencia),sin estructura espacial,10228,16,-4582.461483721508,9198.922967443015,NA,NA,NA,NA
+SAR,rezago de la dependiente,10228,17,-4571.13551170647,9178.27102341294,0.0536,2.716e-6,NA,NA
+SEM,error espacial,10228,17,-4569.425166763071,9174.850333526141,NA,NA,0.0822,1.837e-7
+SDM (principal),rezago de y y de las covariables,10228,24,-4498.527466743388,9047.054933486776,0.0609,2.653e-5,NA,NA

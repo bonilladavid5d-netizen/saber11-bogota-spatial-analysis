@@ -1,0 +1,6 @@
+escala,estado,n_sedes,n_estudiantes,pct_sedes,pct_estudiantes,fuente_atributo,fuente_espacial
+UPZ,coincide,1111,711035,90.768,92.304,COD_UPZ / COD_UPL de colegios06_2025.gpkg,"IndUPZ.shp (112 poligonos) / UnidadPlaneamientoLocal.shp (33 poligonos, POT 2022)"
+UPZ,discrepa,71,44511,5.8007,5.7783,COD_UPZ / COD_UPL de colegios06_2025.gpkg,"IndUPZ.shp (112 poligonos) / UnidadPlaneamientoLocal.shp (33 poligonos, POT 2022)"
+UPZ,sin_poligono,42,14773,3.4314,1.9178,COD_UPZ / COD_UPL de colegios06_2025.gpkg,"IndUPZ.shp (112 poligonos) / UnidadPlaneamientoLocal.shp (33 poligonos, POT 2022)"
+UPL,coincide,1223,769608,99.9183,99.9077,COD_UPZ / COD_UPL de colegios06_2025.gpkg,"IndUPZ.shp (112 poligonos) / UnidadPlaneamientoLocal.shp (33 poligonos, POT 2022)"
+UPL,discrepa,1,711,0.0817,0.0923,COD_UPZ / COD_UPL de colegios06_2025.gpkg,"IndUPZ.shp (112 poligonos) / UnidadPlaneamientoLocal.shp (33 poligonos, POT 2022)"

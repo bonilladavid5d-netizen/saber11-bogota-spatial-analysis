@@ -1,0 +1,14 @@
+bloque,etiqueta,motivo,n,I,p_perm,k,nota
+principal,Principal: todas las sedes del pooled,resultado de referencia,1224,0.3416,0.001,5,
+cobertura,Cobertura: sedes con al menos 10 examenes,descarta 12 sedes con menos de 10 examenes,1212,0.3495,0.001,5,
+cobertura,Cobertura: sedes con al menos 30 examenes,descarta 23 sedes con menos de 30 examenes,1201,0.3507,0.001,5,
+cobertura,Cobertura: sedes con al menos 100 examenes,descarta 93 sedes con menos de 100 examenes,1131,0.3619,0.001,5,
+cobertura,Cobertura: solo aplicaciones de semestre 1,"39,013 examenes en 227 sedes",227,0.5655,0.001,5,
+cobertura,Cobertura: solo aplicaciones de semestre 2,"731,306 examenes en 1195 sedes",1195,0.2516,0.001,5,
+cobertura,Cobertura: solo sedes presentes tambien en la base legacy,1132 sedes,1132,0.321,0.001,5,
+cobertura,Cobertura: solo sedes que la base legacy no tenia,92 sedes,92,0.4757,0.001,5,
+conflictos,Conflictos: excluyendo sedes con desacuerdo de establecimiento,descarta 26 sedes en conflicto,1198,0.3422,0.001,5,
+conflictos,Conflictos: solo sedes con desacuerdo de establecimiento,26 sedes,26,NA,NA,5,menos de 30 unidades: no se estima
+pesos,Pesos: kNN con k = 3,"misma muestra, distinto numero de vecinos",1224,0.3442,0.001,3,
+pesos,Pesos: kNN con k = 8,"misma muestra, distinto numero de vecinos",1224,0.3173,0.001,8,
+pesos,Pesos: kNN con k = 10,"misma muestra, distinto numero de vecinos",1224,0.3035,0.001,10,

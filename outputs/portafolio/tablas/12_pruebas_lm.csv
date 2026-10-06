@@ -1,0 +1,6 @@
+prueba,tipo,estadistico,p_valor,lectura
+RSerr,simple,27.733,1.393e-7,"rechaza ausencia de estructura espacial, pero no distingue el canal"
+RSlag,simple,24.638,6.918e-7,"rechaza ausencia de estructura espacial, pero no distingue el canal"
+adjRSerr,ajustada,6.243,0.01247,contrasta un canal condicionando al otro; aqui no respaldan ambos por igual
+adjRSlag,ajustada,3.148,0.07601,contrasta un canal condicionando al otro; aqui no respaldan ambos por igual
+SARMA,simple,30.881,1.969e-7,"rechaza ausencia de estructura espacial, pero no distingue el canal"

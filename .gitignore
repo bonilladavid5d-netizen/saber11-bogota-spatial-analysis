@@ -1,0 +1,94 @@
+# R
+.Rhistory
+.RData
+.Rapp.history
+.Ruserdata
+.Rproj.user/
+*.Rproj
+.temp 
+.tmp
+.tmp/
+
+# Python (vestigio de iteración previa)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Entornos virtuales
+venv/
+.env
+.venv/
+
+# VS Code
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Datos (no subir datos grandes)
+data/raw/
+data/cleaned/
+data/analysis/
+
+# Outputs: ignorar contenido pero permitir la estructura de carpetas
+# (se versiona un .gitkeep por subcarpeta)
+outputs/*
+!outputs/tables/
+!outputs/figures/
+!outputs/maps/
+!outputs/models/
+outputs/tables/*
+!outputs/tables/.gitkeep
+# Excepciones del caso de portafolio: R/04 las lee como referencia del
+# analisis original y run_analisis.sh las exige al arrancar.
+!outputs/tables/moran_global_principal.csv
+!outputs/tables/tabla_resumen_lisa.csv
+outputs/figures/*
+!outputs/figures/.gitkeep
+outputs/maps/*
+!outputs/maps/.gitkeep
+outputs/models/*
+!outputs/models/.gitkeep
+
+# Archivos temporales
+*.log
+
+# Knit artifacts (regenerable desde el .Rmd)
+notebooks/*.html
+notebooks/main_report_files/
+notebooks/main_report_cache/
+
+# Claude Code internals
+.claude/scheduled_tasks.lock
+
+# ── Integracion del caso de portafolio (v4.1) ────────────────────────────────
+# El patron `outputs/*` de arriba excluye tambien outputs/audit y
+# outputs/portafolio. Se reabren siguiendo la misma convencion del repositorio:
+# primero el directorio, despues su contenido.
+!outputs/audit/
+!outputs/audit/**
+!outputs/portafolio/
+!outputs/portafolio/**
+
+# Los logs de ejecucion son la evidencia de las corridas; `*.log` de arriba los
+# excluiria.
+!outputs/portafolio/evidencia/*.log
+
+# Privado: microdatos reconstruidos (nivel presentacion) y objetos de modelos
+# ajustados (panel sede-ano sin supresion). Regenerables con R/01 y R/05.
+# Van despues de las negaciones para que prevalezcan.
+data/processed/private/
+outputs/portafolio/modelos/
+CLAUDE.local.md
+
+# Archivos comprimidos de datos: data/raw.zip contiene los 18 TXT y
+# data/cleaned.zip el parquet consolidado. Excluir el directorio no basta.
+# outputs.zip y FASE1_HANDOFF.zip son artefactos regenerables.
+data/*.zip
+outputs.zip
+FASE1_HANDOFF.zip

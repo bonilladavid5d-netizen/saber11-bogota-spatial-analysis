@@ -1,0 +1,13 @@
+control,esperado,observado,diferencia,estado,explicacion
+archivos_periodos,18,18,0,PASS,Coincide con el control diagnostico.
+registros_nacionales,5982829,5982829,0,PASS,Coincide con el control diagnostico.
+registros_bogota,791073,791073,0,PASS,Coincide con el control diagnostico.
+match_exacto_sede,770319,770319,0,PASS,Coincide con el control diagnostico.
+filas_gpkg,2221,2221,0,PASS,Coincide con el control diagnostico.
+establecimientos_gpkg,1871,1871,0,PASS,Coincide con el control diagnostico.
+establecimientos_multisede,216,216,0,PASS,Coincide con el control diagnostico.
+coordenadas_plausibles,2219,2219,0,PASS,Coincide con el control diagnostico.
+coordenadas_anomalas,2,2,0,PASS,Coincide con el control diagnostico.
+llaves_faltantes,0,0,0,PASS,Coincide con el control diagnostico.
+llaves_duplicadas,0,0,0,PASS,Coincide con el control diagnostico.
+discrepancias_periodo,0,0,0,PASS,Coincide con el control diagnostico.

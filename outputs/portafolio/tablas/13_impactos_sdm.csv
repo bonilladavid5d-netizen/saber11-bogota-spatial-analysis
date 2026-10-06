@@ -1,0 +1,8 @@
+variable,directo,indirecto,total,p_directo,p_indirecto,p_total,unidad,escala_presentacion,directo_presentado,indirecto_presentado,total_presentado
+estrato_promedio,0.34007,0.02939,0.36946,0,6.895e-5,0,una unidad de estrato,por unidad,0.34007,0.02939,0.36946
+prop_oficial,0.2109,0.15228,0.36318,0,9.215e-10,0,"proporcion en [0,1]",por 10 puntos porcentuales,0.02109,0.01523,0.03632
+prop_internet_hogar,1.55725,-0.56068,0.99657,0,3.739e-9,0,"proporcion en [0,1]",por 10 puntos porcentuales,0.15572,-0.05607,0.09966
+prop_jornada_completa,0.52519,0.14962,0.67481,0,1.288e-9,0,"proporcion en [0,1]",por 10 puntos porcentuales,0.05252,0.01496,0.06748
+prop_calendario_a,0.29875,-0.14709,0.15166,0,1.32e-5,5.956e-5,"proporcion en [0,1]",por 10 puntos porcentuales,0.02988,-0.01471,0.01517
+prop_genero_femenino,0.2768,0.24355,0.52035,0,7.695e-6,0,"proporcion en [0,1]",por 10 puntos porcentuales,0.02768,0.02436,0.05203
+n_estudiantes_log,0.07528,-0.0139,0.06139,0,0.114,1.624e-9,un log-punto de tamano,por unidad,0.07528,-0.0139,0.06139

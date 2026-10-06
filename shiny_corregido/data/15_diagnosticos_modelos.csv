@@ -1,0 +1,5 @@
+modelo,I_residuos_descriptivo,p_valor,nota_p,AIC,logLik
+MCO (referencia),0.03075,NA,no reportado: moran.test() sobre residuos estimados no es un contraste valido post-estimacion,9198.922967443015,-4582.461483721508
+SAR,0.00907,NA,no reportado: moran.test() sobre residuos estimados no es un contraste valido post-estimacion,9178.27102341294,-4571.13551170647
+SEM,-0.0011,NA,no reportado: moran.test() sobre residuos estimados no es un contraste valido post-estimacion,9174.850333526141,-4569.425166763071
+SDM (principal),-0.00134,NA,no reportado: moran.test() sobre residuos estimados no es un contraste valido post-estimacion,9047.054933486776,-4498.527466743388

@@ -1,0 +1,45 @@
+PRUEBAS DIRIGIDAS v4.1 — 2026-10-05 22:56:01
+R 4.4.0  |  Darwin 25.2.0 arm64
+
+snapshot de shiny_corregido/data: 12 archivos
+
+=== PRUEBA 1: huella de 05_modelos que no corresponde al parquet actual ===
+inyectada huella falsa en 05_modelos
+$ Rscript R/06_exportar_shiny.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+6: package ‘spdep’ was built under R version 4.4.1 
+7: package ‘spData’ was built under R version 4.4.1 
+Error: El parquet no coincide con el registrado por 05_modelos.
+  registrado: 0000000000000000
+  actual:   e1e0c3dae4ba739f
+Vuelva a ejecutar las etapas requeridas.
+Execution halted
+codigo de salida = 1
+
+estado restaurado tras la prueba 1
+
+=== PRUEBA 2: falta una tabla requerida; debe bloquear antes de tocar los exports ===
+retirada temporalmente: 13_impactos_sdm.csv
+$ Rscript R/06_exportar_shiny.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+5: package ‘sf’ was built under R version 4.4.3 
+6: package ‘spdep’ was built under R version 4.4.1 
+7: package ‘spData’ was built under R version 4.4.1 
+Error: Faltan tablas requeridas en outputs/portafolio/tablas:
+  13_impactos_sdm.csv
+Ejecute ./run_analisis.sh completo antes de exportar.
+Execution halted
+codigo de salida = 1
+
+tabla restaurada
+exports SIN MODIFICAR: las 12 huellas de shiny_corregido/data son identicas
+estado restaurado tras la prueba 2

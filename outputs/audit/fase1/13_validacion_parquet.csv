@@ -1,0 +1,24 @@
+id_prueba,descripcion,valor_observado,regla_aceptacion,estado,critica
+V01,z almacenado reproduce (punt_global - media) / sd fila a fila,desviacion maxima 0.000e+00,desviacion < 1e-12,PASS,TRUE
+V02,No hay z calculado sobre puntajes invalidos,0 filas,0 filas,PASS,TRUE
+V03,Media y desviacion nacionales son constantes dentro de cada periodo,18/18 periodos con un unico par,un unico par por periodo,PASS,TRUE
+V04,Los momentos nacionales se reproducen leyendo de nuevo los TXT originales,"dif. maxima media 0.00e+00, sd 0.00e+00 en 18 periodos",diferencias < 1e-9,PASS,TRUE
+V05,"La poblacion de los momentos es nacional, no bogotana",razon minima nacional/Bogota 6.5,la poblacion nacional excede a Bogota en los 18 periodos,PASS,TRUE
+V06,En todo match exacto el codigo del catalogo es identico al codigo ICFES de sede,0 discrepancias,0 discrepancias,PASS,TRUE
+V07,Todo codigo vinculado existe en el catalogo 2025 releido del GPKG,0 codigos ausentes,0 ausentes,PASS,TRUE
+V08,Ningun registro sin match exacto recibe coordenadas ni metodo de vinculacion,"0 con metodo, 0 con coordenada",0 y 0,PASS,TRUE
+V09,El codigo de establecimiento nunca se uso como llave de sede,0 casos,0 casos,PASS,TRUE
+V10,Las coordenadas de la base coinciden con las del GPKG para la misma sede,desviacion maxima 0.000e+00 grados,desviacion < 1e-9,PASS,TRUE
+V11,Toda la muestra principal cae dentro del bbox aprobado de Bogota D.C.,0 filas fuera,0 filas,PASS,TRUE
+V12,No hay geometrias centinela en la muestra principal,0 filas,0 filas,PASS,TRUE
+V13,is_main_sample equivale a match exacto con coordenada valida y puntaje valido,0 desacuerdos,0 desacuerdos,PASS,TRUE
+V14,Todo registro tiene exactamente un estado valido,"4 estados observados, 0 filas sin estado",estados dentro del catalogo cerrado y sin faltantes,PASS,TRUE
+V15,exclusion_reason esta vacio si y solo si el registro entra a la muestra principal,"0 con motivo dentro de la muestra, 0 sin motivo fuera",0 y 0,PASS,TRUE
+V16,Todo registro de la base cumple la regla de Bogota por codigo municipal,0 filas con municipio distinto de 11001,0 filas,PASS,TRUE
+V17,Los codigos DANE siguen siendo texto en el parquet,character,todos character,PASS,TRUE
+V18,Los conteos de 06_match_sede_periodo.csv se reproducen desde el parquet actual,0 celdas discrepantes sobre 49,0 discrepancias,PASS,TRUE
+V19,Los porcentajes publicados se recalculan correctamente (parche 1.1),desviacion maxima 0.0000; 48 valores distintos de pct_total_bogota sobre 49 filas,desviacion < 1e-4 y mas de un valor distinto,PASS,TRUE
+V20,El embudo publicado reconcilia con el parquet actual,0 discrepancias en 18 periodos,0 discrepancias,PASS,TRUE
+V21,Los controles publicados se reproducen desde el parquet actual,2 de 2 controles verificables coinciden,todos coinciden,PASS,TRUE
+V22,Los insumos originales conservan su SHA-256,19/19 identicos,todos identicos,PASS,TRUE
+V23,Ninguna tabla publica contiene identificadores individuales,ninguna,0 archivos con patron SB11...,PASS,TRUE

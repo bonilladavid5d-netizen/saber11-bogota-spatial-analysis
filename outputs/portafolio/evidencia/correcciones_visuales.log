@@ -1,0 +1,182 @@
+CORRECCIONES v4.1.1 — 2026-10-06 09:00:40
+repositorio: /Users/davidbonilla/Desktop/proyectos intresentes u /icfes/Proyecto - VP
+
+$ Rscript shiny_corregido/test_app.R
+Warning message:
+package ‘shiny’ was built under R version 4.4.3 
+
+Attaching package: ‘bslib’
+
+The following object is masked from ‘package:utils’:
+
+    page
+
+Linking to GEOS 3.13.0, GDAL 3.8.5, PROJ 9.5.1; sf_use_s2() is TRUE
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:shiny’:
+
+    validate
+
+  [OK] filtro base devuelve todas las sedes (1224)
+  [OK] filtro HH devuelve 120 sedes y coincide con la tabla LISA
+  [OK] excluir conflicto quita 26 sedes (1224 -> 1198)
+  [OK] umbral de presentaciones filtra (556 sedes)
+  [OK] filtro por UPL devuelve 33 sedes
+  [OK] combinacion de filtros deja seleccion vacia (0 sedes)
+  [OK] resumen del mapa no falla con seleccion vacia
+  [OK] tabla LISA no falla con seleccion vacia
+  [OK] resumen del mapa renderiza
+  [OK] tabla LISA renderiza
+  [OK] mapa leaflet renderiza
+  [OK] grafico de evolucion renderiza
+  [OK] grafico de Moran renderiza
+  [OK] evolucion filtrada a primer semestre
+  [OK] evolucion filtrada a segundo semestre
+  [OK] evolucion con ambas aplicaciones
+  [OK] texto del modelo renderiza
+  [OK] grafico de impactos renderiza
+  [OK] tabla de modelos renderiza
+  [OK] tabla de robustez renderiza
+  [OK] limitaciones renderizan
+  [OK] diagnosticos renderizan
+  [OK] tabla territorial renderiza
+  [OK] procedencia renderiza
+There were 28 warnings (use warnings() to see them)
+
+24 comprobaciones OK, 0 fallos
+codigo de salida = 0
+
+=== pruebas con la comprobacion de teselas — 09:01:33 ===
+$ Rscript shiny_corregido/test_app.R
+Warning message:
+package ‘shiny’ was built under R version 4.4.3 
+
+Attaching package: ‘bslib’
+
+The following object is masked from ‘package:utils’:
+
+    page
+
+Linking to GEOS 3.13.0, GDAL 3.8.5, PROJ 9.5.1; sf_use_s2() is TRUE
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:shiny’:
+
+    validate
+
+  [OK] filtro base devuelve todas las sedes (1224)
+  [OK] filtro HH devuelve 120 sedes y coincide con la tabla LISA
+  [OK] excluir conflicto quita 26 sedes (1224 -> 1198)
+  [OK] umbral de presentaciones filtra (556 sedes)
+  [OK] filtro por UPL devuelve 33 sedes
+  [OK] combinacion de filtros deja seleccion vacia (0 sedes)
+  [OK] resumen del mapa no falla con seleccion vacia
+  [OK] tabla LISA no falla con seleccion vacia
+  [OK] resumen del mapa renderiza
+  [OK] tabla LISA renderiza
+  [OK] mapa leaflet renderiza
+  [OK] el mapa base usa teselas de OpenStreetMap, sin clave de API
+  [OK] la atribucion de OpenStreetMap esta presente
+  [OK] grafico de evolucion renderiza
+  [OK] grafico de Moran renderiza
+  [OK] evolucion filtrada a primer semestre
+  [OK] evolucion filtrada a segundo semestre
+  [OK] evolucion con ambas aplicaciones
+  [OK] texto del modelo renderiza
+  [OK] grafico de impactos renderiza
+  [OK] tabla de modelos renderiza
+  [OK] tabla de robustez renderiza
+  [OK] limitaciones renderizan
+  [OK] diagnosticos renderizan
+  [OK] tabla territorial renderiza
+  [OK] procedencia renderiza
+There were 28 warnings (use warnings() to see them)
+
+26 comprobaciones OK, 0 fallos
+codigo de salida = 0
+
+=== v4.1.2: altura del mapa y retiro de pantalla completa — 2026-10-06 09:27:15 ===
+$ Rscript shiny_corregido/test_app.R
+Warning message:
+package ‘shiny’ was built under R version 4.4.3 
+
+Attaching package: ‘bslib’
+
+The following object is masked from ‘package:utils’:
+
+    page
+
+Linking to GEOS 3.13.0, GDAL 3.8.5, PROJ 9.5.1; sf_use_s2() is TRUE
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:shiny’:
+
+    validate
+
+  [OK] filtro base devuelve todas las sedes (1224)
+  [OK] filtro HH devuelve 120 sedes y coincide con la tabla LISA
+  [OK] excluir conflicto quita 26 sedes (1224 -> 1198)
+  [OK] umbral de presentaciones filtra (556 sedes)
+  [OK] filtro por UPL devuelve 33 sedes
+  [OK] combinacion de filtros deja seleccion vacia (0 sedes)
+  [OK] resumen del mapa no falla con seleccion vacia
+  [OK] tabla LISA no falla con seleccion vacia
+  [OK] resumen del mapa renderiza
+  [OK] tabla LISA renderiza
+  [OK] mapa leaflet renderiza
+  [OK] el mapa base usa teselas de OpenStreetMap, sin clave de API
+  [OK] la atribucion de OpenStreetMap esta presente
+  [OK] grafico de evolucion renderiza
+  [OK] grafico de Moran renderiza
+  [OK] evolucion filtrada a primer semestre
+  [OK] evolucion filtrada a segundo semestre
+  [OK] evolucion con ambas aplicaciones
+  [OK] texto del modelo renderiza
+  [OK] grafico de impactos renderiza
+  [OK] tabla de modelos renderiza
+  [OK] tabla de robustez renderiza
+  [OK] limitaciones renderizan
+  [OK] diagnosticos renderizan
+  [OK] tabla territorial renderiza
+  [OK] procedencia renderiza
+There were 28 warnings (use warnings() to see them)
+
+26 comprobaciones OK, 0 fallos
+codigo de salida = 0

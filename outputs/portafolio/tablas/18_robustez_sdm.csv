@@ -1,0 +1,7 @@
+variante,motivo,n,sedes,rho,rho_p,estrato_directo,AIC,nota
+Principal,especificacion de referencia,10228,1224,0.0609,2.653e-5,0.34007,9047.1,
+Sin sedes en conflicto de establecimiento,descarta 26 sedes con desacuerdo ICFES vs catalogo,10071,1198,0.0586,1.479e-4,0.33886,8991.3,
+Sedes con al menos 30 examenes al ano,descarta sede-ano con poca masa,7474,1049,0.1389,6.694e-16,0.38745,4274.8,
+Pesos kNN k = 3,sensibilidad a la definicion de vecindad,10228,1224,0.0331,0.01306,0.3506,9058.8,
+Pesos kNN k = 8,sensibilidad a la definicion de vecindad,10228,1224,0.0833,3.895e-4,0.3572,9066.5,
+Incluyendo prop_bilingue,submuestra donde cole_bilingue si se reporta,8127,932,0.0094,NA,0.36719,6894.1,el Hessiano de diferencias finitas no devuelve error estandar de rho en esta submuestra; el coeficiente se reporta sin contraste

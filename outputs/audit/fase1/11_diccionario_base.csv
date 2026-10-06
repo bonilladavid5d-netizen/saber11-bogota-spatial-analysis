@@ -1,0 +1,67 @@
+variable,tipo,fuente,definicion,transformacion,unidad,valores_permitidos,uso_posterior,clasificacion
+archivo_fuente,character,derivada del nombre del archivo,Nombre del TXT original del que proviene la fila,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+periodo_fuente,character,derivada del nombre del archivo,Periodo derivado del nombre del archivo,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+periodo,character,TXT Saber 11,Periodo declarado en la columna periodo del TXT,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+estu_consecutivo,character,TXT Saber 11,Identificador de la presentacion del examen; no es una persona longitudinal,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_mcpio_ubicacion,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+punt_global_orig,character,TXT Saber 11,"punt_global tal como aparece en el TXT, sin convertir",trimws,puntos Saber 11,,Auditoria y trazabilidad de la Fase 1,privada
+punt_global_num,numeric,derivada en esta fase,punt_global convertido a numerico,as.numeric,puntos Saber 11,"[0,500] para registros validos",Auditoria y trazabilidad de la Fase 1,privada
+punt_global_valido,logical,derivada en esta fase,"TRUE si punt_global es numerico y cae en [0,500]",trimws,puntos Saber 11,,Auditoria y trazabilidad de la Fase 1,privada
+z_punt_global_nacional,numeric,derivada en esta fase,(punt_global - media nacional del periodo) / sd nacional del periodo,estandarizacion nacional por periodo,desviaciones estandar,,Auditoria y trazabilidad de la Fase 1,privada
+media_nacional_periodo,numeric,derivada en esta fase,"Media nacional de punt_global del periodo, calculada antes de filtrar Bogota",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+sd_nacional_periodo,numeric,derivada en esta fase,"Desviacion estandar nacional del periodo, muestral (n-1)",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+score_reference_population,character,derivada en esta fase,Poblacion de referencia del z-score,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_dane_sede_orig,character,TXT Saber 11,Codigo DANE de sede tal como viene en el TXT,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_dane_sede_norm,character,TXT Saber 11,Codigo DANE de sede con espacios recortados; sin relleno de ceros,trimws; vacio a NA,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+dane_sede_valido,logical,derivada en esta fase,TRUE si el codigo de sede tiene exactamente 12 digitos,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_dane_establecimiento_orig,character,TXT Saber 11,Codigo DANE de establecimiento tal como viene en el TXT,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_dane_establecimiento_norm,character,TXT Saber 11,Codigo DANE de establecimiento con espacios recortados,trimws; vacio a NA,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+dane12_sed_catalogo,character,colegios06_2025.gpkg,DANE12_SED de la sede vinculada en el catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+dane12_est_catalogo,character,colegios06_2025.gpkg,DANE12_EST del establecimiento asociado a esa sede en el catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+nombre_est_catalogo,character,colegios06_2025.gpkg,NOMBRE_EST del catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+nombre_sede_catalogo,character,colegios06_2025.gpkg,NOMBRE_SED del catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cod_upz_catalogo,character,colegios06_2025.gpkg,"COD_UPZ del catalogo 2025; atributo heredado, sin cruce espacial",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+nombre_upz_catalogo,character,colegios06_2025.gpkg,NOMBRE_UPZ del catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cod_upl_catalogo,character,colegios06_2025.gpkg,COD_UPL del catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+nombre_upl_catalogo,character,colegios06_2025.gpkg,NOM_UPL del catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+zona_catalogo,character,colegios06_2025.gpkg,ZONA urbana o rural segun el catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+estrato_catalogo,character,colegios06_2025.gpkg,ESTRATO de la sede segun el catalogo 2025,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+lon,numeric,colegios06_2025.gpkg,Longitud de la sede en EPSG:4326,trimws,grados decimales,,Auditoria y trazabilidad de la Fase 1,privada
+lat,numeric,colegios06_2025.gpkg,Latitud de la sede en EPSG:4326,trimws,grados decimales,,Auditoria y trazabilidad de la Fase 1,privada
+coord_status,character,derivada en esta fase,"plausible, centinela_dbl_max, fuera_de_bbox o sin_coordenada",trimws,categorica o identificador,plausible | centinela_dbl_max | fuera_de_bbox | sin_coordenada,Auditoria y trazabilidad de la Fase 1,privada
+match_method,character,derivada en esta fase,dane_sede_exacto o ninguno,trimws,categorica o identificador,dane_sede_exacto | ninguno,Auditoria y trazabilidad de la Fase 1,privada
+match_status,character,derivada en esta fase,"Estado del cruce, exhaustivo y mutuamente excluyente",trimws,categorica o identificador,exact_match_valid_coordinates | exact_match_invalid_coordinates | valid_code_not_in_catalog | missing_or_invalid_seat_code | catalog_conflict | pending_manual_review,Auditoria y trazabilidad de la Fase 1,privada
+conflicto_est_status,character,derivada en esta fase,Desacuerdo entre el establecimiento ICFES y el del catalogo 2025,trimws,categorica o identificador,sin_conflicto | conflicto_establecimiento | no_aplica,Auditoria y trazabilidad de la Fase 1,privada
+catalog_vintage,character,colegios06_2025.gpkg,Fecha de referencia del catalogo de sedes,trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+is_main_sample,logical,derivada en esta fase,"TRUE solo si hay match exacto, coordenada plausible y puntaje valido",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+exclusion_reason,character,derivada en esta fase,"Motivo de exclusion de la muestra principal; prioridad: puntaje invalido, luego match_status",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_cod_depto_ubicacion,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_depto_ubicacion,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_mcpio_ubicacion,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_nombre_sede,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_nombre_establecimiento,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_sede_principal,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_area_ubicacion,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+estu_estudiante,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Diagnostico de composicion de la poblacion elegible,privada
+estu_grado,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Diagnostico de composicion de la poblacion elegible,privada
+estu_agregado,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Diagnostico de composicion de la poblacion elegible,privada
+punt_matematicas,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,puntos Saber 11,,Fase 2: puntajes por area,privada
+punt_lectura_critica,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,puntos Saber 11,,Fase 2: puntajes por area,privada
+punt_c_naturales,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,puntos Saber 11,,Fase 2: puntajes por area,privada
+punt_sociales_ciudadanas,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,puntos Saber 11,,Fase 2: puntajes por area,privada
+punt_ingles,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,puntos Saber 11,,Fase 2: puntajes por area,privada
+cole_naturaleza,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: covariable es_oficial (main_report.Rmd 19.2),privada
+cole_jornada,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: covariable es_jornada_compl (main_report.Rmd 19.2),privada
+cole_calendario,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: control de calendario A/B,privada
+cole_caracter,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_genero,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+cole_bilingue,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: sensibilidad sin bilingues,privada
+estu_genero,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+estu_inse_individual,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: indice socioeconomico individual,privada
+estu_nse_individual,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+estu_nse_establecimiento,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+fami_estratovivienda,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: covariable estrato_familia (main_report.Rmd 19.2),privada
+fami_educacionmadre,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: sensibilidad madre vs estrato,privada
+fami_educacionpadre,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada
+fami_tieneinternet,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Fase 2: covariable de lista B,privada
+fami_tienecomputador,character,TXT Saber 11,"Variable original del TXT Saber 11, conservada sin transformar",trimws,categorica o identificador,,Auditoria y trazabilidad de la Fase 1,privada

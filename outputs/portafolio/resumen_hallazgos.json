@@ -1,0 +1,89 @@
+{
+  "generado": "2026-10-05 23:00:57",
+  "unidad": "sede educativa",
+  "crs_analisis": "EPSG:3116",
+  "w": "kNN k=5 estandarizada por filas",
+  "nsim": 999,
+  "estudiantes_muestra_principal": 770319,
+  "sedes_pooled": 1224,
+  "moran_pooled_I": 0.3416,
+  "moran_pooled_p_perm": 0.001,
+  "moran_periodo_min": 0.2475,
+  "moran_periodo_max": 0.7225,
+  "moran_original_sede": 0.2998,
+  "sedes_original": 1132,
+  "lisa": {
+    "NS": 1008,
+    "HH": 120,
+    "LL": 57,
+    "LH": 24,
+    "HL": 15
+  },
+  "lisa_pct_estudiantes": {
+    "NS": 84.8158,
+    "HH": 7.5317,
+    "LL": 5.0413,
+    "LH": 1.8203,
+    "HL": 0.791
+  },
+  "robustez_I_min": 0.2516,
+  "robustez_I_max": 0.5655,
+  "discrepancia_territorial": [
+    {
+      "escala": "UPZ",
+      "n_sedes": 71,
+      "pct_sedes": 5.8007,
+      "n_estudiantes": 44511,
+      "pct_estudiantes": 5.7783
+    },
+    {
+      "escala": "UPL",
+      "n_sedes": 1,
+      "pct_sedes": 0.0817,
+      "n_estudiantes": 711,
+      "pct_estudiantes": 0.0923
+    }
+  ],
+  "escalas": [
+    {
+      "escala": "sede",
+      "asignacion": "codigo DANE de sede",
+      "n": 1224,
+      "I": 0.3416,
+      "p_perm": 0.001,
+      "nota": ""
+    },
+    {
+      "escala": "UPZ (atributo del catalogo)",
+      "asignacion": "atributo heredado del catalogo 2025",
+      "n": 110,
+      "I": 0.4672,
+      "p_perm": 0.001,
+      "nota": ""
+    },
+    {
+      "escala": "UPZ (cruce espacial)",
+      "asignacion": "cruce espacial con poligonos vigentes",
+      "n": 104,
+      "I": 0.4325,
+      "p_perm": 0.001,
+      "nota": ""
+    },
+    {
+      "escala": "UPL (atributo del catalogo)",
+      "asignacion": "atributo heredado del catalogo 2025",
+      "n": 33,
+      "I": 0.3621,
+      "p_perm": 0.001,
+      "nota": ""
+    },
+    {
+      "escala": "UPL (cruce espacial)",
+      "asignacion": "cruce espacial con poligonos vigentes",
+      "n": 33,
+      "I": 0.357,
+      "p_perm": 0.001,
+      "nota": ""
+    }
+  ]
+}

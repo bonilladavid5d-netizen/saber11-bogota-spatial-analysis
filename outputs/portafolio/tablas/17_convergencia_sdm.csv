@@ -1,0 +1,7 @@
+aspecto,valor
+Ajuste del SDM,"log-verosimilitud -4498.53, AIC 9047.1"
+rho estimado,"0.0609 (ee 0.0145, p = 2.653e-05)"
+Intervalo admisible de rho,"(-1.000, 0.999)"
+Covariable con VIF mas alto,prop_oficial = 2.60
+Observaciones sin vecinos,0
+Observaciones y parametros,"n = 10228, k = 24"

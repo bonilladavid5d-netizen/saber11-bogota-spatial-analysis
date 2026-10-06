@@ -1,0 +1,17 @@
+id_prueba,descripcion,valor_observado,regla_aceptacion,estado,archivo_evidencia
+T01,Hay exactamente 18 periodos unicos,18,n_distinct(periodo_fuente) == 18,PASS,00_input_manifest.csv
+T02,Ningun insumo cambio durante y despues de la ejecucion,19/19 SHA-256 identicos,todos los SHA-256 coinciden con el manifiesto,PASS,00_input_manifest.csv
+T03,Los codigos DANE permanecieron como texto,cole_cod_dane_sede_orig=character; cole_cod_dane_sede_norm=character; cole_cod_dane_establecimiento_orig=character; cole_cod_dane_establecimiento_norm=character; dane12_sed_catalogo=character; dane12_est_catalogo=character,todas las columnas DANE son character,PASS,data/processed/private/saber11_bogota_sede_auditada.parquet
+T04,La llave utilizada es periodo + estu_consecutivo,periodo + estu_consecutivo,ambas columnas presentes en la base,PASS,11_diccionario_base.csv
+T05,La llave no tiene faltantes ni duplicados dentro del periodo,"base: 0 faltantes, 0 duplicados | archivos: 0 faltantes, 0 duplicados",los cuatro conteos son 0,PASS,02_integridad_llave_periodo.csv
+T06,El periodo interno coincide con el periodo del archivo,archivos: 0 | base: 0,ambos conteos son 0,PASS,02_integridad_llave_periodo.csv
+T07,Los momentos nacionales se calcularon antes de filtrar Bogota,en 18/18 periodos la poblacion de momentos supera a Bogota,la poblacion de momentos excede a Bogota en los 18 periodos,PASS,03_momentos_nacionales_periodo.csv
+T08,La media del z-score nacional es aproximadamente 0 por periodo,max |media| = 1.314e-13,max |media| < 1e-8,PASS,03_momentos_nacionales_periodo.csv
+T09,La desviacion del z-score nacional es aproximadamente 1 por periodo,max |sd - 1| = 5.236e-13,max |sd - 1| < 1e-8,PASS,03_momentos_nacionales_periodo.csv
+T10,La union con el catalogo no multiplica estudiantes,"791,073 -> 791,073 filas",filas despues == filas antes,PASS,run_metadata.json
+T11,"No se uso nombre, fuzzy, proximidad ni primera sede para la muestra principal","match_method: dane_sede_exacto, ninguno | funciones prohibidas en los scripts que construyen la muestra: ninguna","match_method solo dane_sede_exacto o ninguno, y sin funciones de emparejamiento aproximado o espacial",PASS,06_match_sede_periodo.csv
+T12,Los estados del cruce son exhaustivos y mutuamente excluyentes,"4 estados suman 791,073 de 791,073 filas",cada fila tiene exactamente un estado valido,PASS,06_match_sede_periodo.csv
+T13,La suma del embudo reconcilia con el total de Bogota,"desfase maximo por periodo: 0 | total embudo 791,073 vs base 791,073",muestra principal + excluidos == total de Bogota en cada periodo,PASS,05_embudo_bogota_periodo.csv
+T14,No existen rutas absolutas ni setwd() en los scripts nuevos,"0 llamadas a setwd, 0 cadenas con ruta absoluta",cero coincidencias de setwd() o rutas absolutas,PASS,R/
+T15,"Raw, microdatos y bases privadas estan excluidos de Git",repositorio presente; 0 archivo(s) sensible(s) versionado(s) o preparado(s); reglas .gitignore 7/7,cero archivos sensibles en el indice y todas las reglas presentes,PASS,.gitignore
+T16,"Dos ejecuciones de 01 repiten los cinco agregados incluidos en el digest (momentos, integridad, embudo, match y controles)",actual a7340f855318 vs anterior a7340f855318,digest identico de esas cinco tablas entre corridas; no cubre el parquet completo ni el analisis,PASS,run_metadata.json

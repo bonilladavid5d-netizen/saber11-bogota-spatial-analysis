@@ -1,0 +1,10 @@
+indicador,original,corregido,nota
+"Moran global I, escala sede",0.2998,0.3416,El original estandariza dentro de la muestra bogotana; el corregido usa la referencia nacional por periodo.
+Unidades espaciales (sedes),"1,132","1,224",El original vinculaba por nombre a nivel de establecimiento; el corregido por codigo DANE de sede.
+Presentaciones en el CSV legacy geolocalizado,"719,466","770,319","719.466 es el CSV legacy completo (1.149 sedes), no su muestra analitica final. La corregida es la muestra principal de la Fase 1."
+Presentaciones en las 1.132 sedes analiticas comunes,"716,279","716,279",Sedes presentes en ambas bases y con coordenada plausible. En ellas no hay diferencia de conteo por periodo x sede.
+Sedes en conglomerado NS,936,"1,008",Clasificacion LISA con p < 0.05 y la misma W kNN k=5.
+Sedes en conglomerado HH,101,  120,Clasificacion LISA con p < 0.05 y la misma W kNN k=5.
+Sedes en conglomerado LL, 57,   57,Clasificacion LISA con p < 0.05 y la misma W kNN k=5.
+Sedes en conglomerado LH, 24,   24,Clasificacion LISA con p < 0.05 y la misma W kNN k=5.
+Sedes en conglomerado HL, 14,   15,Clasificacion LISA con p < 0.05 y la misma W kNN k=5.

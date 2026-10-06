@@ -1,0 +1,67 @@
+T15 EN EL REPOSITORIO ORIGINAL — 2026-10-06 00:08:01
+raiz: /Users/davidbonilla/Desktop/proyectos intresentes u /icfes/Proyecto - VP
+rama: main | HEAD: fbb8e14
+R 4.4.0 | Darwin 25.2.0 arm64
+
+$ Rscript R/02_validar_fase1.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 16 PASS, 0 FAIL, 0 otros -> PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (288.0 KB)
+codigo de salida = 0
+
+=== REEJECUCION tras cerrar la brecha de los .zip — 2026-10-06 00:45:48 ===
+$ Rscript R/02_validar_fase1.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 16 PASS, 0 FAIL, 0 otros -> PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (288.2 KB)
+codigo de salida = 0
+
+=== REEJECUCION con el patron corregido ([.]zip / [.]parquet) — 2026-10-06 09:00:52 ===
+$ Rscript R/02_validar_fase1.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 16 PASS, 0 FAIL, 0 otros -> PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (288.3 KB)
+codigo de salida = 0
+
+=== T15 CON EL INDICE PREPARADO (cierre documental) — 2026-10-06 11:01:38 ===
+rama: main | HEAD: fbb8e14
+archivos preparados: 90
+$ Rscript R/02_validar_fase1.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 16 PASS, 0 FAIL, 0 otros -> PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (288.3 KB)
+codigo de salida = 0
+
+=== T15 CON LA SELECCION FINAL — 2026-10-06 11:11:39 ===
+rama: main | HEAD: fbb8e14
+archivos preparados: 92
+$ Rscript R/02_validar_fase1.R
+Warning messages:
+1: package ‘readr’ was built under R version 4.4.3 
+2: package ‘dplyr’ was built under R version 4.4.3 
+3: package ‘stringr’ was built under R version 4.4.1 
+4: package ‘arrow’ was built under R version 4.4.3 
+Pruebas: 16 PASS, 0 FAIL, 0 otros -> PASS
+Reportes escritos en outputs/audit/fase1
+Paquete: FASE1_HANDOFF.zip (288.4 KB)
+codigo de salida = 0

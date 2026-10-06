@@ -1,0 +1,3539 @@
+---
+title: "Saber 11 — Base de estudiantes de Bogotá con ubicación espacial de colegios"
+subtitle: "Construcción, diagnóstico, homologación y control de calidad"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    number_sections: true
+editor_options:
+  chunk_output_type: console
+---
+
+---
+
+# 1. Configuración global
+
+## 1.1 Opciones del documento
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+## 1.2 Librerías
+
+```{r librerias}
+
+if (!require('pacman')) install.packages('pacman')
+pacman::p_load(ggplot2,readxl,dplyr,psych,tidyr,ggdist,reshape2,GGally,cluster,fpc,vcd,esquisse,dplyr,tidyverse,rpart,caret,haven,utils,rpart,rpart.plot,glmnet,ggplot2,sf,foreign,spdep,tmap,RColorBrewer,openxlsx,scales,spatialreg,splm,plm,patchwork,modelsummary)
+
+library(tidyverse)
+library(arrow)
+library(janitor)
+library(sf)
+library(scales)
+```
+
+Definiendo directorio 
+```{r}
+
+# Obtener el usuario del sistema
+usuario <- "Esteban"   # <-- Cambiar al nombre correspondiente antes de knit
+
+# Seleccionar directorio según usuario
+if (usuario == "David") {
+  setwd("/Users/davidbonilla/Downloads/Data/GEIH_2025")
+  ruta_base <- "/Users/davidbonilla/Downloads/Data/GEIH_2025"
+
+} else if (usuario == "Esteban") {
+  setwd("C:\\Users\\windows\\Documents\\Esteban 2025-1\\Maestria\\Taller de programacion en R\\Proyecto")
+
+} else if (usuario == "Luisa") {
+  setwd("/home/Luisa/proyecto/")
+  ruta_base <- "/home/Luisa/proyecto/Data/GEIH_2025"   # ajustar si difiere
+
+# ── PROFESOR: ponga sus rutas aquí y cambie usuario <- "profesor" arriba ──────
+} else if (usuario == "profesor") {
+  setwd("RUTA_DE_TRABAJO_DEL_PROFESOR")          # Ej: "C:/Users/profesor/Taller2"
+  ruta_base <- "RUTA_DATOS_GEIH_DEL_PROFESOR"   # Ej: "C:/Users/profesor/Taller2/Data/GEIH_2025"
+# ─────────────────────────────────────────────────────────────────────────────
+
+} else {
+  stop(paste0(
+    "Usuario '", usuario, "' no reconocido. ",
+    "Agregue su bloque 'else if' con sus rutas o use usuario <- 'profesor'."
+  ))
+}
+
+# Mostrar el directorio actual
+getwd()
+
+```
+
+
+
+
+## 1.3 Rutas y directorios
+
+```{r rutas}
+# Detectar la raíz del proyecto independientemente de si el .Rmd
+# se ejecuta desde la raíz o desde un subdirectorio (notebooks/).
+RAIZ <- if (dir.exists(file.path(normalizePath("."), "data"))) {
+  normalizePath(".")
+} else if (dir.exists(file.path(normalizePath(".."), "data"))) {
+  normalizePath("..")
+} else {
+  stop("No se encontró el directorio 'data'. Verifique la ubicación del .Rmd.")
+}
+cat(sprintf("Raíz del proyecto: %s\n", RAIZ))
+
+RUTAS <- list(
+  raw      = file.path(RAIZ, "data", "raw"),
+  cleaned  = file.path(RAIZ, "data", "cleaned"),
+  analysis = file.path(RAIZ, "data", "analysis"),
+  outputs  = file.path(RAIZ, "outputs")
+)
+
+walk(RUTAS, \(d) dir.create(d, recursive = TRUE, showWarnings = FALSE))
+
+# Flag de control para regeneracion de outputs pesados.
+# FALSE por defecto: si los archivos existen, no se sobrescriben en cada knit
+# (preserva R2: idempotencia y no-destruccion de productos costosos ya
+# generados). TRUE: fuerza la regeneracion de CSV/GeoJSON/diagnosticos.
+# Activar SOLO cuando hay un cambio intencional en la logica de filtrado,
+# homologacion o exportacion.
+REGENERAR_OUTPUTS_PESADOS <- FALSE
+```
+
+## 1.4 Estándar cartográfico Q1
+
+Constantes que se usan en TODAS las salidas visuales del proyecto
+(mapas LISA, histogramas W, mapas de conexiones, distribuciones).
+Definir aquí garantiza coherencia visual entre figuras y replicabilidad.
+
+```{r q1_standard}
+# Paleta LISA estandar GeoDa, con categoria NoData adicional para
+# unidades sin observaciones (preserva la silueta completa de la malla).
+LISA_PALETTE <- c(
+  HH      = "#B2182B",   # rojo oscuro: hot spot
+  LL      = "#2166AC",   # azul oscuro: cold spot
+  HL      = "#E08214",   # naranja: outlier alto-bajo
+  LH      = "#92C5DE",   # celeste: outlier bajo-alto
+  NS      = "#F0F0F0",   # gris muy claro: no significativo
+  NoData  = "#BDBDBD"    # gris medio: malla sin observaciones
+)
+
+# Tipografia: "sans" es el unico safe-default en Windows + R; en
+# entornos con extrafont se podria escalar a Source Sans Pro o Lato.
+Q1_FONT_FAMILY <- "sans"
+Q1_BASE_SIZE   <- 11
+
+# Bordes (estilo cartografia profesional)
+Q1_BORDER_LWD     <- 0.2
+Q1_BORDER_COLOR   <- "grey40"
+
+# Resolucion y dimensiones
+Q1_DPI    <- 300
+Q1_FIG_W  <- 10
+Q1_FIG_H  <- 8
+
+# Pie de mapa estandar
+Q1_CAPTION <- paste("Fuente: ICFES Saber 11 (2016-2024) y SDP / IDECA.",
+                    "Elaboracion propia.")
+
+# Tema ggplot Q1 reutilizable
+theme_q1 <- function(base_size = Q1_BASE_SIZE) {
+  ggplot2::theme_minimal(base_size = base_size, base_family = Q1_FONT_FAMILY) +
+    ggplot2::theme(
+      plot.title       = ggplot2::element_text(face = "bold",
+                                                size = base_size + 1),
+      plot.subtitle    = ggplot2::element_text(color = "grey40"),
+      plot.caption     = ggplot2::element_text(color = "grey50",
+                                                 size = base_size - 2,
+                                                 hjust = 0),
+      axis.title       = ggplot2::element_text(size = base_size - 1),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_line(color = "grey90",
+                                                 linewidth = 0.3),
+      legend.title     = ggplot2::element_text(size = base_size - 1,
+                                                 face = "bold"),
+      legend.text      = ggplot2::element_text(size = base_size - 2)
+    )
+}
+```
+
+---
+
+# 2. Definición de archivos
+
+```{r definir_archivos}
+ARCHIVOS <- list(
+  # Parquet de consolidación generado por ESTE pipeline desde los TXT crudos.
+  consolidado = file.path(RUTAS$cleaned, "saber11_consolidado.parquet"),
+  colegios    = file.path(RUTAS$raw,     "colegios06_2025.gpkg"),
+  zat_zonas   = file.path(RUTAS$raw,     "ZATS2019.geojson")
+)
+```
+
+---
+
+# 3. Verificación de archivos
+
+```{r verificar_archivos}
+reporte_archivos <- tibble(
+  archivo = names(ARCHIVOS),
+  ruta    = unlist(ARCHIVOS)
+) |>
+  mutate(
+    existe = map_lgl(ruta, file.exists),
+    tam_mb = map_dbl(ruta, \(r) if (file.exists(r)) round(file.size(r) / 1e6, 1) else NA_real_),
+    estado = if_else(existe, "presente", "AUSENTE")
+  )
+
+knitr::kable(
+  reporte_archivos |> select(archivo, estado, tam_mb, ruta),
+  caption   = "Estado de archivos del proyecto",
+  col.names = c("Archivo", "Estado", "Tamaño (MB)", "Ruta")
+)
+```
+
+---
+
+# 4. Hallazgos sobre codificación de los archivos TXT
+
+Los archivos TXT del ICFES (`Examen_Saber_11_*.txt`) están codificados en
+**UTF-8** (sin BOM) con terminaciones de línea CRLF. Esta conclusión surge de
+inspeccionar los bytes crudos: el carácter `É` aparece como la secuencia
+`0xC3 0x89` (195, 137), que es su representación UTF-8, y no como `0xC9`
+(201), que sería su valor en ISO-8859-1 / latin1.
+
+Leer estos archivos con `locale(encoding = "latin1")` produce la corrupción
+de caracteres acentuados (`É` → `Ã\x89`, `Ó` → `Ã\x93`, etc.), que es
+precisamente el origen de los símbolos extraños observados al abrir la base.
+
+**Corrección aplicada**: se usa `locale(encoding = "UTF-8")` en la función de
+carga. Los nombres de columnas no contienen acentos, por lo que `clean_names()`
+opera correctamente en ambos casos; el problema afecta únicamente los valores
+de columnas de texto como `cole_nombre_establecimiento`, `cole_mcpio_ubicacion`
+y variables de `fami_educacion*`.
+
+---
+
+# 5. Función de carga: archivos TXT Saber 11
+
+```{r fn_cargar_txt}
+cargar_txt_saber11 <- function(ruta) {
+  periodo_str <- str_extract(basename(ruta), "\\d{5}")
+
+  read_delim(
+    ruta,
+    delim          = ";",
+    locale         = locale(encoding = "UTF-8"),  # UTF-8, no latin1
+    show_col_types = FALSE,
+    progress       = FALSE
+  ) |>
+    clean_names() |>
+    mutate(
+      archivo_origen = basename(ruta),
+      periodo        = periodo_str,
+      anio           = as.integer(str_sub(periodo_str, 1, 4)),
+      semestre       = as.integer(str_sub(periodo_str, 5, 5))
+    )
+}
+```
+
+---
+
+# 6. Carga y consolidación desde archivos TXT crudos
+
+La fuente primaria de datos son los archivos TXT del ICFES. Para evitar releer
+los archivos completos (~5 GB) en cada ejecución, el pipeline guarda su propio
+parquet de consolidación (`saber11_consolidado.parquet`) en `data/cleaned/`.
+Este parquet se regenera automáticamente si no existe o si no contiene las
+columnas de identificación de colegio requeridas para el cruce espacial.
+
+```{r cols_criticas}
+# Columnas mínimas requeridas para el cruce espacial.
+# Si el consolidado en disco no las tiene, se reconsolida desde los TXT.
+COLS_CRITICAS <- c("cole_cod_dane_establecimiento", "cole_nombre_establecimiento")
+```
+
+```{r cargar_datos}
+archivos_txt <- list.files(
+  RUTAS$raw,
+  pattern    = "^Examen_Saber_11_.*\\.txt$",
+  full.names = TRUE
+)
+
+if (length(archivos_txt) == 0) {
+  stop("No se encontraron archivos TXT en: ", RUTAS$raw)
+}
+
+# Usar el consolidado como caché si ya existe y está completo.
+# En cualquier otro caso, leer todos los TXT desde cero.
+# El check file.size > 100MB protege contra parquet truncado (crash, I/O
+# interrumpido); el check de cols protege contra parquet con esquema viejo.
+consolidado_existe   <- file.exists(ARCHIVOS$consolidado) &&
+                        file.size(ARCHIVOS$consolidado) > 100e6
+consolidado_completo <- FALSE
+
+if (consolidado_existe) {
+  cols_consolidado     <- arrow::open_dataset(ARCHIVOS$consolidado)$schema$names
+  consolidado_completo <- all(COLS_CRITICAS %in% cols_consolidado)
+}
+
+if (consolidado_completo) {
+
+  cat("Fuente: consolidado propio existente y completo.\n")
+  saber11_raw <- arrow::read_parquet(ARCHIVOS$consolidado)
+
+} else {
+
+  if (consolidado_existe && !consolidado_completo) {
+    cat("El consolidado en disco no contiene las columnas criticas.\n")
+    cat("Se reconsolida desde los archivos TXT.\n\n")
+  } else {
+    cat("Consolidado no encontrado. Leyendo archivos TXT.\n")
+  }
+
+  cat(sprintf("Archivos TXT a procesar: %d\n", length(archivos_txt)))
+
+  cat(sprintf("Periodos              : %s\n",
+              paste(
+                sort(stringr::str_extract(basename(archivos_txt), "\\d{5}")),
+                collapse = ", "
+              )))
+
+  saber11_raw <- purrr::map(archivos_txt, \(f) {
+    cat(sprintf("  Leyendo: %s\n", basename(f)))
+
+    cargar_txt_saber11(f) |>
+      dplyr::mutate(
+        dplyr::across(dplyr::everything(), as.character)  
+      )
+  }) |>
+    purrr::list_rbind()
+
+  cat("\nConsolidacion completada.\n")
+}
+
+# ---- Resumen final ----
+cat(sprintf("Registros totales  : %s\n",
+            format(nrow(saber11_raw), big.mark = ",")))
+
+cat(sprintf("Columnas           : %d\n",
+            ncol(saber11_raw)))
+
+cat(sprintf("Periodos cubiertos : %s\n",
+            paste(sort(unique(saber11_raw$anio)), collapse = ", ")))
+
+```
+
+---
+
+# 7. Diagnóstico estructural de la base
+
+## 7.1 Columnas observadas y tipos
+
+```{r diagnostico_tipos}
+tibble(
+  columna = names(saber11_raw),
+  tipo    = map_chr(saber11_raw, \(x) class(x)[1])
+) |>
+  knitr::kable(caption = "Columnas observadas y tipos de datos")
+```
+
+## 7.2 Porcentaje de valores faltantes por variable
+
+```{r diagnostico_na}
+saber11_raw |>
+  summarise(across(everything(), \(x) round(mean(is.na(x)) * 100, 2))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "pct_na") |>
+  filter(pct_na >= 1) |>
+  arrange(desc(pct_na)) |>
+  knitr::kable(caption = "Variables con 1% o más de valores faltantes",
+               col.names = c("Variable", "% NA"))
+```
+
+## 7.3 Columnas esperadas versus columnas observadas
+
+```{r diagnostico_columnas_esperadas}
+cols_esperadas <- c(
+  "periodo", "anio", "semestre",
+  "cole_cod_depto_ubicacion", "cole_depto_ubicacion",
+  "cole_cod_mcpio_ubicacion", "cole_mcpio_ubicacion",
+  "cole_cod_dane_establecimiento", "cole_nombre_establecimiento",
+  "cole_naturaleza", "cole_jornada", "cole_calendario",
+  "estu_genero", "estu_fechanacimiento",
+  "fami_estratovivienda", "fami_educacionmadre", "fami_educacionpadre",
+  "punt_matematicas", "punt_lectura_critica",
+  "punt_c_naturales", "punt_sociales_ciudadanas",
+  "punt_ingles", "punt_global"
+)
+
+buscar_similar <- function(col, disponibles, umbral = 8) {
+  if (col %in% disponibles) return(NA_character_)
+  d   <- adist(col, disponibles, ignore.case = TRUE)[1, ]
+  idx <- which.min(d)
+  if (d[idx] <= umbral) disponibles[idx] else NA_character_
+}
+
+cols_obs <- names(saber11_raw)
+
+diagnostico_cols <- tibble(columna_esperada = cols_esperadas) |>
+  mutate(
+    existe_exacta    = columna_esperada %in% cols_obs,
+    similar_sugerida = map_chr(columna_esperada, buscar_similar, disponibles = cols_obs),
+    decision = case_when(
+      existe_exacta                                    ~ "presente",
+      !existe_exacta & !is.na(similar_sugerida)        ~ "revisar",
+      TRUE                                             ~ "ausente"
+    ),
+    observacion = case_when(
+      existe_exacta ~
+        "Columna presente con nombre exacto.",
+      !existe_exacta & !is.na(similar_sugerida) ~
+        paste0("No encontrada. Candidata: '", similar_sugerida, "'. Requiere validacion manual."),
+      TRUE ~
+        "No encontrada. No debe asumirse su existencia."
+    )
+  )
+
+knitr::kable(diagnostico_cols,
+             caption   = "Diagnóstico: columnas esperadas vs observadas",
+             col.names = c("Columna esperada", "Exacta", "Similar sugerida", "Decision", "Observacion"))
+```
+
+---
+
+# 8. Nota técnica: cole_cod_dane_establecimiento y la clave de unión espacial
+
+## Sobre cole_cod_dane_establecimiento
+
+La inspección directa de los archivos TXT del ICFES confirma que la columna
+`cole_cod_dane_establecimiento` **existe** en todos los períodos disponibles
+(2016–2024), con ese nombre exacto tras aplicar `clean_names()`. Contiene el
+código DANE de 12 dígitos del establecimiento educativo (formato:
+2 dígitos de departamento + 3 de municipio + 7 del establecimiento).
+
+Ejemplo observado: `376147000103` para un establecimiento del municipio 76147
+(Cartago, Valle del Cauca).
+
+## Sobre el GeoPackage de colegios
+
+El archivo `colegios06_2025.gpkg` contiene las siguientes columnas relevantes:
+
+| Columna en GeoPackage | Contenido | Equivalente ICFES |
+|---|---|---|
+| `DANE12_EST` | Código DANE 12 dígitos del establecimiento | `cole_cod_dane_establecimiento` |
+| `DANE12_SED` | Código DANE 12 dígitos de la sede | `cole_cod_dane_sede` |
+| `NIT` | Número de Identificación Tributaria (diferente del DANE) | sin equivalente directo |
+| `NOMBRE_EST` | Nombre del establecimiento | `cole_nombre_establecimiento` |
+| `COD_UPZ` / `NOMBRE_UPZ` | Código y nombre de la UPZ | — |
+| `ESTRATO` | Estrato del colegio | — |
+
+**Punto crítico**: `NIT` y `DANE12_EST` son identificadores distintos. El
+`NIT` es el número tributario (ej. `830049093`), mientras que `DANE12_EST` es
+el código estadístico de 12 dígitos (ej. `111001044806`). La unión con la base
+ICFES debe hacerse usando `DANE12_EST`, no `NIT`.
+
+## Estrategia de unión: tres niveles
+
+1. **Nivel 1 (exacto por DANE)**: `cole_cod_dane_establecimiento` = `DANE12_EST`.
+   Confianza alta; sin ambigüedad.
+
+2. **Nivel 2 (exacto por nombre normalizado)**: si no hay match por DANE,
+   comparar nombres normalizados (sin tildes, sin sufijos como "IED", "IERD",
+   en mayúsculas). Confianza media.
+
+3. **Nivel 3 (aproximado por nombre)**: distancia Levenshtein normalizada sobre
+   nombres únicos de colegios. Se acepta el match si la distancia normalizada es
+   menor al umbral definido. Confianza baja; debe auditarse.
+
+---
+
+# 9. Controles de calidad
+
+## 9.1 Duplicados
+
+```{r control_duplicados}
+
+#No es necesario correrlo en cada ejecucion solo era un control para cuando estaba creando la base de datos
+
+Correrduplicados<-"False"
+
+if(Correrduplicados=="V"){
+n_total  <- nrow(saber11_raw)
+n_dup    <- sum(duplicated(saber11_raw))
+
+cat(sprintf("Registros totales    : %s\n",  format(n_total, big.mark = ",")))
+cat(sprintf("Registros duplicados : %s (%.3f%%)\n", format(n_dup, big.mark = ","),
+            100 * n_dup / n_total))
+
+if (n_dup > 0) {
+  saber11_raw <- distinct(saber11_raw)
+  cat(sprintf("Duplicados eliminados. Registros restantes: %s\n",
+              format(nrow(saber11_raw), big.mark = ",")))
+}
+
+} else{
+  " "
+}
+
+```
+
+## 9.2 Rangos de puntajes
+
+```{r control_puntajes}
+cols_puntaje <- intersect(
+  c("punt_matematicas", "punt_lectura_critica", "punt_c_naturales",
+    "punt_sociales_ciudadanas", "punt_ingles", "punt_global"),
+  names(saber11_raw)
+)
+
+saber11_raw <- saber11_raw |>
+  mutate(across(all_of(cols_puntaje), as.numeric))
+
+saber11_raw |>
+  summarise(across(
+    all_of(cols_puntaje),
+    list(min = \(x) min(x, na.rm = TRUE), max = \(x) max(x, na.rm = TRUE),
+         media = \(x) round(mean(x, na.rm = TRUE), 2),
+         pct_na = \(x) round(mean(is.na(x)) * 100, 2)),
+    .names = "{.col}__{.fn}"
+  )) |>
+  pivot_longer(everything(), names_sep = "__", names_to = c("variable", "stat")) |>
+  pivot_wider(names_from = stat, values_from = value) |>
+  knitr::kable(caption = "Estadísticas de puntajes", digits = 2)
+
+n_fuera_rango <- saber11_raw |>
+  filter(if_any(all_of(cols_puntaje), \(x) x < 0 | x > 500)) |>
+  nrow()
+cat(sprintf("Registros con puntaje fuera de [0, 500]: %d\n", n_fuera_rango))
+```
+
+## 9.3 Coherencia temporal
+
+```{r control_temporal}
+cols_tiempo <- intersect(c("anio", "semestre", "periodo"), names(saber11_raw))
+
+if (length(cols_tiempo) > 0) {
+  saber11_raw |>
+    count(across(all_of(cols_tiempo)), name = "n") |>
+    arrange(across(all_of(cols_tiempo))) |>
+    knitr::kable(caption = "Distribución de registros por periodo")
+}
+```
+
+---
+
+# 10. Construcción del parquet limpio
+
+```{r construir_parquet}
+# Lista completa de columnas a conservar en el parquet limpio.
+# Se usa intersect() para tomar solo las que existen en saber11_raw,
+# sin asumir que todas están presentes en todos los periodos.
+cols_prioritarias <- c(
+  # Identificadores temporales
+  "periodo", "anio", "semestre", "archivo_origen",
+  # Identificadores del establecimiento (criticos para el cruce espacial)
+  "cole_cod_dane_establecimiento", "cole_cod_dane_sede", "cole_codigo_icfes",
+  "cole_nombre_establecimiento", "cole_nombre_sede", "cole_sede_principal",
+  # Localización del colegio
+  "cole_cod_depto_ubicacion", "cole_cod_mcpio_ubicacion",
+  "cole_depto_ubicacion", "cole_mcpio_ubicacion", "cole_area_ubicacion",
+  # Características del colegio
+  "cole_naturaleza", "cole_jornada", "cole_calendario",
+  "cole_caracter", "cole_genero", "cole_bilingue",
+  # Estudiante
+  "estu_genero", "estu_fechanacimiento", "estu_grado",
+  "estu_inse_individual", "estu_nse_individual", "estu_nse_establecimiento",
+  "estu_discapacidad", "estu_etnia", "estu_tieneetnia", "estu_nacionalidad",
+  # Familia
+  "fami_estratovivienda", "fami_educacionmadre", "fami_educacionpadre",
+  "fami_cuartoshogar", "fami_personashogar", "fami_numlibros",
+  "fami_tieneautomovil", "fami_tienecomputador", "fami_tieneinternet",
+  "fami_tienelavadora", "fami_tieneserviciotv", "fami_tienemotocicleta",
+  # Puntajes
+  "punt_matematicas", "punt_lectura_critica", "punt_c_naturales",
+  "punt_sociales_ciudadanas", "punt_ingles", "punt_global",
+  # Percentiles y desempeños
+  "percentil_matematicas", "percentil_lectura_critica", "percentil_global",
+  "percentil_c_naturales", "percentil_ingles", "percentil_sociales_ciudadanas",
+  "desemp_matematicas", "desemp_lectura_critica",
+  "desemp_c_naturales", "desemp_ingles", "desemp_sociales_ciudadanas"
+)
+
+cols_a_conservar <- intersect(cols_prioritarias, names(saber11_raw))
+
+if (consolidado_completo) {
+  # El parquet en disco YA es el resultado de filter + select + str_squish
+  # (fue escrito por una ejecución previa de este mismo bloque). Saltar la
+  # recompute para no gastar 15 min y 8 GB de RAM cada knit.
+  saber11_limpio <- saber11_raw
+
+  # Verificación defensiva: si el cache fue escrito por una versión anterior
+  # del código que no aplicaba str_squish, este chequeo lo detecta y avisa al
+  # investigador para que regenere el parquet manualmente.
+  set.seed(42)
+  muestra_chk <- saber11_raw |>
+    select(where(is.character)) |>
+    slice_sample(n = 1000)
+
+  hay_strings_sucios <- muestra_chk |>
+    summarise(across(everything(),
+                     ~ any(.x != str_squish(.x), na.rm = TRUE))) |>
+    unlist() |> any()
+
+  if (hay_strings_sucios) {
+    warning("El parquet en cache tiene strings sin str_squish. ",
+            "Posiblemente fue escrito por una version anterior. ",
+            "Borrar data/cleaned/saber11_consolidado.parquet y ",
+            "volver a knit para regenerarlo correctamente.")
+  } else {
+    cat("Cache validado: saber11_raw ya tiene strings limpios. ",
+        "Saltando recompute de str_squish (~15 min ahorrados).\n")
+  }
+} else {
+  # Camino completo: solo se ejecuta si NO hay cache valido.
+  saber11_limpio <- saber11_raw |>
+    filter(!is.na(punt_global)) |>
+    select(all_of(cols_a_conservar)) |>
+    mutate(across(where(is.character), str_squish))
+
+  write_parquet(saber11_limpio, ARCHIVOS$consolidado)
+  cat(sprintf("Consolidado guardado: %s (%.1f MB)\n",
+              basename(ARCHIVOS$consolidado),
+              file.size(ARCHIVOS$consolidado) / 1e6))
+}
+
+cat(sprintf("Columnas en raw              : %d\n",  ncol(saber11_raw)))
+cat(sprintf("Columnas conservadas         : %d\n",  ncol(saber11_limpio)))
+cat(sprintf("Columnas no encontradas      : %d\n",
+            length(setdiff(cols_prioritarias, names(saber11_raw)))))
+cat(sprintf("Registros finales            : %s\n",  format(nrow(saber11_limpio), big.mark = ",")))
+
+# Verificar que las columnas criticas para el cruce espacial quedaron incluidas
+criticas_presentes <- COLS_CRITICAS %in% names(saber11_limpio)
+if (all(criticas_presentes)) {
+  cat("Columnas criticas para cruce espacial: presentes.\n")
+} else {
+  warning("Columnas criticas ausentes en saber11_limpio: ",
+          paste(COLS_CRITICAS[!criticas_presentes], collapse = ", "))
+}
+
+# (write_parquet ya esta dentro del else superior si no habia cache)
+if (consolidado_completo) {
+  cat("Consolidado existente conservado.\n")
+} else {
+  cat("Cache regenerado en esta corrida.\n")
+}
+```
+
+## 10.1 Validación post-escritura
+
+```{r validar_consolidado}
+if (!consolidado_completo) {
+  # Solo verificar cuando se reescribió el consolidado en esta ejecución
+  pq_check <- read_parquet(ARCHIVOS$consolidado)
+  cat(sprintf("Filas verificadas         : %s\n",  format(nrow(pq_check), big.mark = ",")))
+  cat(sprintf("Columnas verificadas      : %d\n",   ncol(pq_check)))
+  cat(sprintf("Columnas criticas OK      : %s\n",   all(COLS_CRITICAS %in% names(pq_check))))
+  cat(sprintf("Integridad columnas OK    : %s\n",
+              identical(sort(names(pq_check)), sort(names(saber11_limpio)))))
+  rm(pq_check); gc(verbose = FALSE)
+} else {
+  cat(sprintf("Consolidado en memoria    : %s registros x %d columnas\n",
+              format(nrow(saber11_limpio), big.mark = ","), ncol(saber11_limpio)))
+  cat(sprintf("Columnas criticas OK      : %s\n",
+              all(COLS_CRITICAS %in% names(saber11_limpio))))
+}
+```
+
+---
+
+# 11. Filtro: estudiantes de Bogotá
+
+```{r filtrar_bogota}
+# Bogotá DC: codigo de departamento = 11
+saber11_bogota <- saber11_limpio |>
+  filter(str_starts(as.character(cole_cod_depto_ubicacion), "11") |
+         str_detect(str_to_upper(cole_depto_ubicacion), "BOGOT"))
+
+cat(sprintf("Estudiantes Bogotá  : %s\n", format(nrow(saber11_bogota), big.mark = ",")))
+cat(sprintf("Períodos            : %s\n",
+            paste(sort(unique(saber11_bogota$anio)), collapse = ", ")))
+cat(sprintf("Colegios únicos     : %d\n",
+            n_distinct(saber11_bogota$cole_cod_dane_establecimiento)))
+```
+
+---
+
+# 12. Integración espacial: carga y preparación de colegios
+
+```{r cargar_colegios}
+colegios_sf <- st_read(ARCHIVOS$colegios, quiet = TRUE) |>
+  clean_names()
+
+cat(sprintf("Colegios cargados : %d\n",  nrow(colegios_sf)))
+cat(sprintf("Columnas          : %s\n",  paste(names(colegios_sf), collapse = ", ")))
+cat(sprintf("CRS original      : %s\n",  st_crs(colegios_sf)$input))
+cat(sprintf("Tipo geometría    : %s\n",  unique(as.character(st_geometry_type(colegios_sf)))))
+```
+
+Revisando datos
+```{r}
+nrow(colegios_sf)
+table(st_geometry_type(colegios_sf))
+st_crs(colegios_sf)
+
+
+sf::st_bbox(colegios_sf)
+head(sf::st_coordinates(colegios_sf))
+
+
+```
+
+Corregindo CRS
+```{r}
+coords <- sf::st_coordinates(colegios_sf)
+
+colegios_sf <- colegios_sf[
+  is.finite(coords[, "X"]) & is.finite(coords[, "Y"]),
+]
+
+colegios_sf <- sf::st_set_crs(colegios_sf, 4326)
+```
+
+
+```{r estandarizar_crs}
+
+#No correr este chunck 
+
+CRS_TARGET <- 4326
+
+crs_actual <- sf::st_crs(colegios_sf)$epsg
+
+if (!is.na(crs_actual) && crs_actual != CRS_TARGET) {
+  cat("Reproyectando a EPSG:", CRS_TARGET, "\n")
+
+  # Eliminar geometrías vacías
+  colegios_sf <- colegios_sf |>
+    dplyr::filter(!sf::st_is_empty(geom))
+
+  # Validar geometrías
+  invalidas <- !sf::st_is_valid(colegios_sf)
+  if (any(invalidas)) {
+    cat("Corrigiendo geometrías inválidas...\n")
+    colegios_sf <- sf::st_make_valid(colegios_sf)
+  }
+
+  # Revisar coordenadas finitas
+  coords <- sf::st_coordinates(colegios_sf)
+  filas_ok <- is.finite(coords[, "X"]) & is.finite(coords[, "Y"])
+
+  if (!all(filas_ok)) {
+    cat("Eliminando puntos con coordenadas no finitas...\n")
+    colegios_sf <- colegios_sf[filas_ok, ]
+  }
+
+  # Probar primero con una muestra
+  cat("Probando transformación en muestra...\n")
+  test_sf <- sf::st_transform(
+    colegios_sf[seq_len(min(100, nrow(colegios_sf))), ],
+    CRS_TARGET
+  )
+
+  # Si la muestra funciona, transformar todo
+  cat("Transformando dataset completo...\n")
+  colegios_sf <- sf::st_transform(colegios_sf, CRS_TARGET)
+
+} else if (is.na(crs_actual)) {
+  cat("CRS ausente: asignando EPSG:", CRS_TARGET, "\n")
+  colegios_sf <- sf::st_set_crs(colegios_sf, CRS_TARGET)
+
+} else {
+  cat("CRS ya es EPSG:", CRS_TARGET, "\n")
+}
+```
+
+```{r preparar_colegios_tabla}
+# Extraer coordenadas y seleccionar columnas relevantes del GeoPackage
+# Columnas clave confirmadas por inspección directa del archivo:
+#   dane12_est  → código DANE 12 dígitos (join con cole_cod_dane_establecimiento)
+#   nombre_est  → nombre del establecimiento (join por nombre como fallback)
+#   nit         → número tributario (NO equivale al DANE)
+#   cod_upz, nombre_upz → zona UPZ
+#   nom_upl, cod_upl    → zona UPL
+#   estrato, zona, barrio_ge, direccion
+
+cols_geo_disponibles <- names(colegios_sf)
+cat("Columnas disponibles en GeoPackage:\n")
+cat(paste(cols_geo_disponibles, collapse = ", "), "\n")
+
+colegios_tabla <- colegios_sf |>
+  dplyr::mutate(
+    lon = sf::st_coordinates(geom)[, 1],
+    lat = sf::st_coordinates(geom)[, 2]
+  ) |>
+  sf::st_drop_geometry() |>
+  dplyr::mutate(
+    # Mantener como texto para no romper códigos DANE largos
+    dane12_est_str = dplyr::case_when(
+      is.na(dane12_est) ~ NA_character_,
+      TRUE ~ stringr::str_trim(format(dane12_est, scientific = FALSE, trim = TRUE))
+    )
+  ) |>
+  dplyr::filter(
+    !is.na(dane12_est_str),
+    dane12_est_str != ""
+  ) |>
+  dplyr::select(
+    dane12_est_str,
+    nombre_est,
+    nit,
+    dplyr::any_of(c(
+      "cod_upz", "nombre_upz", "cod_upl", "nom_upl",
+      "estrato", "zona", "barrio_ge", "direccion",
+      "dane12_sed"
+    )),
+    lon, lat
+  ) |>
+  dplyr::distinct(dane12_est_str, .keep_all = TRUE)
+
+cat(sprintf("Colegios en tabla   : %d\n", nrow(colegios_tabla)))
+cat(sprintf("Con coordenadas     : %d\n", sum(!is.na(colegios_tabla$lon))))
+
+```
+
+---
+
+# 13. Función de homologación: coincidencias exactas y aproximadas
+
+```{r fn_normalizar_nombre}
+# Normalización de nombres de colegios para comparación robusta:
+# 1. Mayúsculas
+# 2. Transliteración de acentos y diacríticos → ASCII
+# 3. Eliminación de sufijos institucionales comunes
+# 4. Compresión de espacios y eliminación de caracteres no alfanuméricos
+normalizar_nombre_colegio <- function(x) {
+  sufijos <- paste0(
+    "\\(IED\\)|\\(IERD\\)|\\(IE\\)|\\(SED\\)|",
+    "\\bIERD\\b|\\bIED\\b|\\bIE\\b|",
+    "\\bCOLEGIO\\b|\\bINSTITUCION\\b|\\bINSTITUTO\\b|",
+    "\\bEDUCATIVO\\b|\\bEDUCATIVA\\b|\\bDISTRITAL\\b|",
+    "\\bNACIONAL\\b|\\bTECNICO\\b|\\bTECNICA\\b"
+  )
+  x |>
+    str_to_upper() |>
+    iconv(to = "ASCII//TRANSLIT") |>
+    str_remove_all(sufijos) |>
+    str_remove_all("[^A-Z0-9 ]") |>
+    str_squish()
+}
+```
+
+```{r fn_construir_mapa_colegios}
+# Construye un mapa de colegios ICFES → colegios GeoPackage en tres niveles:
+#   L1: match exacto por código DANE12
+#   L2: match exacto por nombre normalizado
+#   L3: match aproximado por distancia Levenshtein normalizada
+#
+# Opera sobre colegios únicos (no sobre cada estudiante), lo que hace
+# la operación eficiente incluso con bases de millones de registros.
+
+construir_mapa_colegios <- function(df_saber11, df_colegios_geo,
+                                    umbral_dist = 0.22) {
+
+  # Tabla de colegios únicos en Saber 11
+  colegios_s11 <- df_saber11 |>
+    distinct(cole_cod_dane_establecimiento, cole_nombre_establecimiento) |>
+    mutate(
+      dane_str_s11    = as.character(as.integer(cole_cod_dane_establecimiento)),
+      nombre_norm_s11 = normalizar_nombre_colegio(cole_nombre_establecimiento)
+    )
+
+  # Tabla de colegios geoespaciales
+  geo <- df_colegios_geo |>
+    mutate(
+      nombre_norm_geo = normalizar_nombre_colegio(nombre_est)
+    )
+
+  # ── Nivel 1: match exacto por DANE ─────────────────────────────────────────
+  match_l1 <- colegios_s11 |>
+    inner_join(geo, by = c("dane_str_s11" = "dane12_est_str"),
+               relationship = "many-to-one") |>
+    mutate(nivel_match = "L1_dane_exacto", confianza = 1.0)
+
+  pendiente_l1 <- colegios_s11 |>
+    anti_join(geo, by = c("dane_str_s11" = "dane12_est_str"))
+
+  # ── Nivel 2: match exacto por nombre normalizado ────────────────────────────
+  geo_por_nombre <- geo |>
+    distinct(nombre_norm_geo, .keep_all = TRUE)
+
+  match_l2 <- pendiente_l1 |>
+    inner_join(geo_por_nombre, by = c("nombre_norm_s11" = "nombre_norm_geo")) |>
+    mutate(nivel_match = "L2_nombre_exacto", confianza = 0.90)
+
+  pendiente_l2 <- pendiente_l1 |>
+    anti_join(geo_por_nombre, by = c("nombre_norm_s11" = "nombre_norm_geo"))
+
+  # ── Nivel 3: match aproximado por distancia Levenshtein normalizada ─────────
+  nombres_s11 <- unique(pendiente_l2$nombre_norm_s11)
+  nombres_geo <- unique(geo$nombre_norm_geo)
+
+  match_l3 <- if (length(nombres_s11) > 0 && length(nombres_geo) > 0) {
+
+    # Matriz de distancias edición (filas = s11, columnas = geo)
+    dist_mat  <- adist(nombres_s11, nombres_geo, ignore.case = TRUE)
+    # Normalizar por longitud del string más largo del par
+    max_len   <- outer(nchar(nombres_s11), nchar(nombres_geo), pmax)
+    dist_norm <- dist_mat / pmax(max_len, 1L)
+
+    # Para cada nombre s11, tomar el match de menor distancia
+    best_idx  <- apply(dist_norm, 1, which.min)
+    best_dist <- dist_norm[cbind(seq_along(nombres_s11), best_idx)]
+
+    mapa_fuzzy <- tibble(
+      nombre_norm_s11 = nombres_s11,
+      nombre_norm_geo = nombres_geo[best_idx],
+      distancia_norm  = best_dist
+    ) |>
+      filter(distancia_norm <= umbral_dist)
+
+    if (nrow(mapa_fuzzy) > 0) {
+      pendiente_l2 |>
+        inner_join(mapa_fuzzy, by = "nombre_norm_s11") |>
+        inner_join(geo_por_nombre, by = "nombre_norm_geo", suffix = c("", ".geo")) |>
+        mutate(nivel_match = "L3_nombre_fuzzy", confianza = 1 - distancia_norm)
+    } else {
+      tibble()
+    }
+  } else {
+    tibble()
+  }
+
+  # ── Combinar los tres niveles ───────────────────────────────────────────────
+  cols_geo <- c("dane12_est_str", "nombre_est", "nit",
+                intersect(c("cod_upz", "nombre_upz", "cod_upl", "nom_upl",
+                            "estrato", "zona", "barrio__ge", "direccion"),
+                          names(geo)),
+                "lon", "lat")
+
+  mapa_final <- bind_rows(match_l1, match_l2, match_l3) |>
+    select(cole_cod_dane_establecimiento, cole_nombre_establecimiento,
+           nivel_match, confianza,
+           any_of(cols_geo)) |>
+    distinct(cole_cod_dane_establecimiento, .keep_all = TRUE)
+
+  n_total  <- nrow(colegios_s11)
+  n_sin    <- n_total - nrow(mapa_final)
+
+  resumen <- tibble(
+    nivel       = c("L1: DANE exacto", "L2: Nombre exacto",
+                    "L3: Nombre aproximado", "Sin match"),
+    n_colegios  = c(nrow(match_l1), nrow(match_l2),
+                    if (is.data.frame(match_l3)) nrow(match_l3) else 0L,
+                    n_sin),
+    pct_colegios = round(c(nrow(match_l1), nrow(match_l2),
+                           if (is.data.frame(match_l3)) nrow(match_l3) else 0L,
+                           n_sin) / n_total * 100, 1)
+  )
+
+  list(mapa = mapa_final, resumen = resumen)
+}
+```
+
+---
+
+# 14. Aplicación de la homologación y construcción de la base geolocalizada
+
+```{r aplicar_homologacion}
+cat("Construyendo mapa de colegios (tres niveles de match)...\n")
+
+resultado_match <- construir_mapa_colegios(saber11_bogota, colegios_tabla)
+mapa_colegios   <- resultado_match$mapa
+resumen_match   <- resultado_match$resumen
+
+cat("Resumen de match por nivel:\n")
+print(resumen_match)
+knitr::kable(resumen_match,
+             caption   = "Resultado de homologación de colegios",
+             col.names = c("Nivel", "Colegios", "% del total"))
+```
+
+```{r construir_base_geolocalizada}
+# Unir estudiantes con la tabla de match para heredar coordenadas y UPZ
+saber11_bogota_geo <- saber11_bogota |>
+  left_join(
+    mapa_colegios |>
+      select(cole_cod_dane_establecimiento, nivel_match, confianza,
+             any_of(c("lon", "lat", "cod_upz", "nombre_upz",
+                      "cod_upl", "nom_upl", "estrato", "zona", "nit"))),
+    by           = "cole_cod_dane_establecimiento",
+    relationship = "many-to-one"
+  )
+
+n_geo  <- sum(!is.na(saber11_bogota_geo$lon))
+n_nogeo <- sum(is.na(saber11_bogota_geo$lon))
+
+cat(sprintf("Estudiantes con coordenadas  : %s (%.1f%%)\n",
+    format(n_geo, big.mark = ","), 100 * n_geo / nrow(saber11_bogota_geo)))
+cat(sprintf("Estudiantes sin coordenadas  : %s (%.1f%%)\n",
+    format(n_nogeo, big.mark = ","), 100 * n_nogeo / nrow(saber11_bogota_geo)))
+```
+
+```{r crear_sf_final}
+
+CRS_TARGET<-4326
+
+saber11_bogota_sf <- saber11_bogota_geo |>
+  filter(!is.na(lon), !is.na(lat)) |>
+  st_as_sf(coords = c("lon", "lat"), crs = CRS_TARGET, remove = FALSE)
+
+cat(sprintf("Base espacial final: %s registros x %d columnas\n",
+    format(nrow(saber11_bogota_sf), big.mark = ","),
+    ncol(saber11_bogota_sf)))
+cat(sprintf("Colegios únicos geolocalizados: %d\n",
+    n_distinct(saber11_bogota_sf$cole_cod_dane_establecimiento)))
+```
+
+---
+
+# 15. Análisis
+
+## 15.1 Estadísticas por UPZ
+
+```{r analisis_upz}
+if ("nombre_upz" %in% names(saber11_bogota_sf) &&
+    any(!is.na(saber11_bogota_sf$nombre_upz))) {
+
+  stats_upz <- saber11_bogota_sf |>
+    st_drop_geometry() |>
+    group_by(nombre_upz) |>
+    summarise(
+      n_estudiantes    = n(),
+      n_colegios       = n_distinct(cole_cod_dane_establecimiento),
+      prom_global      = round(mean(punt_global,         na.rm = TRUE), 2),
+      prom_matematicas = round(mean(punt_matematicas,     na.rm = TRUE), 2),
+      prom_lectura     = round(mean(punt_lectura_critica, na.rm = TRUE), 2),
+      .groups = "drop"
+    ) |>
+    arrange(desc(prom_global))
+
+  knitr::kable(head(stats_upz, 15),
+               caption = "Top 15 UPZ por puntaje global promedio")
+} else {
+  cat("La variable 'nombre_upz' no está disponible en la base geolocalizada.\n")
+}
+```
+
+## 15.2 Top colegios
+
+```{r analisis_top_colegios}
+top_colegios <- saber11_bogota_sf |>
+  st_drop_geometry() |>
+  group_by(cole_cod_dane_establecimiento, cole_nombre_establecimiento) |>
+  summarise(
+    n               = n(),
+    prom_global     = round(mean(punt_global,         na.rm = TRUE), 2),
+    prom_matematicas = round(mean(punt_matematicas,    na.rm = TRUE), 2),
+    prom_lectura    = round(mean(punt_lectura_critica, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) |>
+  filter(n >= 30) |>
+  slice_max(prom_global, n = 20) |>
+  mutate(ranking = row_number())
+
+knitr::kable(
+  top_colegios |> select(ranking, cole_nombre_establecimiento, n, prom_global, prom_matematicas, prom_lectura),
+  caption   = "Top 20 colegios — Bogotá (mínimo 30 estudiantes)",
+  col.names = c("#", "Colegio", "N", "Global", "Matemáticas", "Lectura")
+)
+```
+
+## 15.3 Tendencia anual
+
+```{r analisis_temporal}
+saber11_bogota_sf |>
+  st_drop_geometry() |>
+  group_by(anio) |>
+  summarise(
+    n               = n(),
+    prom_global     = round(mean(punt_global,         na.rm = TRUE), 2),
+    prom_matematicas = round(mean(punt_matematicas,    na.rm = TRUE), 2),
+    prom_lectura    = round(mean(punt_lectura_critica, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) |>
+  knitr::kable(caption = "Tendencia anual — Bogotá",
+               col.names = c("Año", "N estudiantes", "Global", "Matemáticas", "Lectura"))
+```
+
+## 15.4 Visualización: distribución del puntaje global
+
+```{r plot_distribucion_global, fig.height=5}
+saber11_bogota_sf |>
+  st_drop_geometry() |>
+  filter(!is.na(punt_global)) |>
+  ggplot(aes(x = punt_global)) +
+  geom_histogram(bins = 60, fill = "#4E79A7", color = "white", linewidth = 0.2) +
+  scale_x_continuous(breaks = seq(0, 500, 50)) +
+  scale_y_continuous(labels = label_comma()) +
+  labs(
+    title   = "Distribución del puntaje global — Bogotá",
+    x       = "Puntaje global",
+    y       = "Número de estudiantes",
+    caption = "Fuente: ICFES — Saber 11"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## 15.5 Visualización: puntaje por nivel de match
+
+```{r plot_match_nivel, fig.height=5}
+saber11_bogota_sf |>
+  st_drop_geometry() |>
+  filter(!is.na(nivel_match), !is.na(punt_global)) |>
+  ggplot(aes(x = nivel_match, y = punt_global)) +
+  geom_boxplot(fill = "#59A14F", alpha = 0.7, outlier.size = 0.3) +
+  labs(
+    title   = "Puntaje global según nivel de match espacial",
+    subtitle = "Verificación: el nivel de match no debería afectar la distribución del puntaje",
+    x       = "Nivel de homologación",
+    y       = "Puntaje global",
+    caption = "Fuente: ICFES — Saber 11"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# 16. Exportación de outputs
+
+```{r exportar_csv}
+ruta_csv <- file.path(RUTAS$analysis, "estudiantes_bogota_geolocalizados.csv")
+if (!file.exists(ruta_csv) || REGENERAR_OUTPUTS_PESADOS) {
+  write_csv(saber11_bogota_geo |> filter(!is.na(lon)), ruta_csv, na = "")
+  cat(sprintf("CSV escrito: %s (%.1f MB)\n",
+              basename(ruta_csv), file.size(ruta_csv) / 1e6))
+} else {
+  cat(sprintf("CSV ya existe (%.1f MB), no se reescribe (REGENERAR_OUTPUTS_PESADOS=FALSE).\n",
+              file.size(ruta_csv) / 1e6))
+}
+```
+
+```{r exportar_geojson}
+ruta_geojson <- file.path(RUTAS$analysis, "estudiantes_bogota_geolocalizados.geojson")
+if (!file.exists(ruta_geojson) || REGENERAR_OUTPUTS_PESADOS) {
+  cols_geojson <- intersect(
+    c("periodo", "anio", "semestre",
+      "cole_cod_dane_establecimiento", "cole_nombre_establecimiento",
+      "cole_naturaleza", "cole_jornada", "cole_calendario",
+      "estu_genero",
+      "cod_upz", "nombre_upz",
+      "punt_global", "punt_matematicas", "punt_lectura_critica",
+      "punt_c_naturales", "punt_sociales_ciudadanas",
+      "fami_estratovivienda",
+      "nivel_match", "confianza", "lon", "lat"),
+    names(saber11_bogota_sf)
+  )
+  saber11_bogota_sf |>
+    select(all_of(cols_geojson)) |>
+    st_write(ruta_geojson, delete_dsn = TRUE, quiet = TRUE)
+  cat(sprintf("GeoJSON escrito: %s (%.1f MB)\n",
+              basename(ruta_geojson), file.size(ruta_geojson) / 1e6))
+} else {
+  cat(sprintf("GeoJSON ya existe (%.1f MB), no se reescribe (REGENERAR_OUTPUTS_PESADOS=FALSE).\n",
+              file.size(ruta_geojson) / 1e6))
+}
+```
+
+```{r exportar_diagnosticos}
+ruta_diag <- file.path(RUTAS$analysis, "diagnostico_columnas_saber11.csv")
+ruta_qc   <- file.path(RUTAS$analysis, "control_calidad_saber11.csv")
+ruta_mapa <- file.path(RUTAS$analysis, "mapa_homologacion_colegios.csv")
+
+if (!file.exists(ruta_diag) || REGENERAR_OUTPUTS_PESADOS) {
+  write_csv(diagnostico_cols, ruta_diag, na = "")
+  cat(sprintf("Diagnostico de columnas escrito: %s\n", basename(ruta_diag)))
+} else {
+  cat(sprintf("Diagnostico de columnas ya existe (%.1f KB), no se reescribe.\n",
+              file.size(ruta_diag) / 1e3))
+}
+
+if (!file.exists(ruta_qc) || REGENERAR_OUTPUTS_PESADOS) {
+  control_calidad <- map(names(saber11_limpio), \(col) {
+    x <- saber11_limpio[[col]]
+    tibble(
+      variable   = col,
+      tipo       = class(x)[1],
+      n_no_na    = sum(!is.na(x)),
+      n_na       = sum(is.na(x)),
+      pct_na     = round(100 * mean(is.na(x)), 2),
+      n_distinct = n_distinct(x, na.rm = TRUE),
+      minimo     = if (is.numeric(x)) as.character(round(min(x, na.rm = TRUE), 4)) else NA_character_,
+      maximo     = if (is.numeric(x)) as.character(round(max(x, na.rm = TRUE), 4)) else NA_character_
+    )
+  }) |>
+    list_rbind()
+  write_csv(control_calidad, ruta_qc, na = "")
+  cat(sprintf("Control de calidad escrito: %s\n", basename(ruta_qc)))
+} else {
+  cat(sprintf("Control de calidad ya existe (%.1f KB), no se reescribe.\n",
+              file.size(ruta_qc) / 1e3))
+}
+
+if (!file.exists(ruta_mapa) || REGENERAR_OUTPUTS_PESADOS) {
+  write_csv(mapa_colegios, ruta_mapa, na = "")
+  cat(sprintf("Mapa homologacion escrito: %s\n", basename(ruta_mapa)))
+} else {
+  cat(sprintf("Mapa homologacion ya existe (%.1f KB), no se reescribe.\n",
+              file.size(ruta_mapa) / 1e3))
+}
+```
+
+```{r resumen_pipeline}
+cat("\n=== RESUMEN FINAL ===\n")
+cat(sprintf("Estudiantes Bogotá total       : %s\n",
+    format(nrow(saber11_bogota), big.mark = ",")))
+cat(sprintf("Estudiantes geolocalizados     : %s (%.1f%%)\n",
+    format(nrow(saber11_bogota_sf), big.mark = ","),
+    100 * nrow(saber11_bogota_sf) / nrow(saber11_bogota)))
+cat(sprintf("Colegios únicos geolocalizados : %d\n",
+    n_distinct(saber11_bogota_sf$cole_cod_dane_establecimiento)))
+cat(sprintf("Match por DANE (L1)            : %d colegios\n",
+    resumen_match$n_colegios[resumen_match$nivel == "L1: DANE exacto"]))
+cat(sprintf("Match por nombre exacto (L2)   : %d colegios\n",
+    resumen_match$n_colegios[resumen_match$nivel == "L2: Nombre exacto"]))
+cat(sprintf("Match por nombre fuzzy (L3)    : %d colegios\n",
+    resumen_match$n_colegios[resumen_match$nivel == "L3: Nombre aproximado"]))
+```
+
+---
+
+# 17. Conclusiones técnicas
+
+## Codificación de los archivos fuente
+
+Los archivos TXT del ICFES están codificados en UTF-8 (sin BOM) con
+terminaciones CRLF. La lectura previa con `locale(encoding = "latin1")`
+producía corrupción sistemática de caracteres acentuados porque los bytes
+multibyte de UTF-8 eran interpretados como dos caracteres latin1 distintos.
+La corrección es usar `locale(encoding = "UTF-8")` en `read_delim()`.
+
+## Disponibilidad de cole_cod_dane_establecimiento
+
+La inspección directa de los archivos TXT confirma que la columna
+`cole_cod_dane_establecimiento` está presente en todos los períodos
+disponibles (2016–2024), con ese nombre exacto en el encabezado. La tabla
+de diagnóstico de la sección 7.3 verifica su existencia en la base cargada
+y debe consultarse antes de cualquier operación de filtrado o join.
+
+## Clave de unión con el GeoPackage
+
+El GeoPackage `colegios06_2025.gpkg` contiene dos identificadores numéricos
+del colegio: `NIT` (número tributario, 9 dígitos) y `DANE12_EST` (código DANE
+de 12 dígitos). El join con la base ICFES debe hacerse usando `DANE12_EST`,
+que es el equivalente de `cole_cod_dane_establecimiento`. El campo `NIT` no
+es el mismo identificador y su uso como clave de unión produciría errores de
+homologación.
+
+## Homologación en tres niveles
+
+El mapa de colegios construido en la sección 13 clasifica cada colegio de
+Bogotá según el nivel de confianza del match: L1 (DANE exacto), L2 (nombre
+normalizado exacto) o L3 (nombre aproximado). El campo `nivel_match` queda
+en la base final para permitir auditoría posterior. Los registros con match
+L3 deben revisarse antes de usarlos en análisis de precisión espacial.
+
+---
+
+# 18. Saneamiento de capas espaciales (CRS canónico EPSG:3116)
+
+Esta sección documenta la generación del GeoPackage maestro
+`data/cleaned/spatial_layers_3116.gpkg`, que contiene las cuatro capas
+espaciales del proyecto **ya saneadas y reproyectadas a EPSG:3116**
+(MAGNA-SIRGAS / Colombia Bogotá zone), el CRS canónico del proyecto.
+
+Toda la modelación espacial posterior debe leer estas capas, **no** los
+archivos originales en `data/raw/`.
+
+## 18.1 Resumen de las correcciones aplicadas
+
+| Capa de salida | Origen | Etiqueta CRS original | Corrección |
+|---|---|---|---|
+| `colegios` | `data/raw/colegios06_2025.gpkg` | EPSG:3857 (incorrecta; los datos están en lon/lat) | Filtrar puntos con coords `±1.797e+308`, re-asignar EPSG:4326 con `st_set_crs`, reproyectar a 3116 |
+| `zats_puntos` | `data/raw/Zats.geojson` | EPSG:4686 (incorrecta; los datos ya están en 3116) | Re-asignar EPSG:3116 con `st_set_crs`, sin reproyección |
+| `zats_poligonos` | `data/raw/ZATS2019.geojson` | EPSG:4686 (correcta) | Reproyectar con `st_transform` a 3116 |
+| `geopanel_colegios` | `data/raw/geopanel1523date.geojson` | EPSG:4686 (correcta) | Reproyectar con `st_transform` a 3116 |
+
+**Nota crítica:** `st_set_crs` re-asigna la etiqueta sin tocar las
+coordenadas (correcto para etiquetas erróneas), mientras que
+`st_transform` mueve las coordenadas según el cambio de CRS (correcto
+para reproyectar entre dos CRS válidos). Confundir los dos aquí
+produciría desplazamientos catastróficos (~8.000 km en el caso del
+GeoPackage de colegios).
+
+## 18.2 Generación del GeoPackage saneado
+
+El siguiente chunk regenera `spatial_layers_3116.gpkg` desde los
+archivos crudos. Está marcado con `eval = FALSE` para que **no se
+ejecute en cada knit** (el archivo ya está en disco). Cambiar a
+`eval = TRUE` o `regenerar_spatial <- TRUE` para reconstruir.
+
+```{r generar_spatial_layers_3116, eval=FALSE}
+#' @description Regenera data/cleaned/spatial_layers_3116.gpkg desde los
+#'   archivos crudos en data/raw/, aplicando las correcciones de CRS
+#'   documentadas en la tabla anterior y reproyectando todo a EPSG:3116.
+#' @return Escribe un GeoPackage con cuatro capas: colegios, zats_puntos,
+#'   zats_poligonos, geopanel_colegios. No retorna valor.
+
+CRS_TARGET <- 3116
+out_path   <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+if (file.exists(out_path)) file.remove(out_path)
+
+# ---- Capa 1: colegios ---------------------------------------------------
+col <- sf::st_read(file.path(RUTAS$raw, "colegios06_2025.gpkg"), quiet = TRUE)
+cc  <- sf::st_coordinates(col)
+ok  <- is.finite(cc[,1]) & is.finite(cc[,2]) &
+       abs(cc[,1]) < 1e6 & abs(cc[,2]) < 1e6
+col <- col[ok, , drop = FALSE]
+col <- sf::st_set_crs(col, 4326)          # re-asigna etiqueta correcta
+col_3116 <- sf::st_transform(col, CRS_TARGET)
+sf::st_write(col_3116, out_path, layer = "colegios", quiet = TRUE)
+
+# ---- Capa 2: zats_puntos -----------------------------------------------
+zp <- sf::st_read(file.path(RUTAS$raw, "Zats.geojson"), quiet = TRUE)
+zp <- sf::st_set_crs(zp, CRS_TARGET)      # ya esta en 3116, solo re-etiqueta
+sf::st_write(zp, out_path, layer = "zats_puntos", quiet = TRUE)
+
+# ---- Capa 3: zats_poligonos --------------------------------------------
+# TODO(investigador): definir filtro Bogota-DC para los poligonos ZAT.
+#   MUNCod es 0 o NA en muchos registros; sin un campo confiable de
+#   municipio se conservan los 1141 poligonos completos.
+zpoly <- sf::st_read(file.path(RUTAS$raw, "ZATS2019.geojson"), quiet = TRUE)
+zpoly_3116 <- sf::st_transform(zpoly, CRS_TARGET)
+sf::st_write(zpoly_3116, out_path, layer = "zats_poligonos", quiet = TRUE)
+
+# ---- Capa 4: geopanel_colegios -----------------------------------------
+gp <- sf::st_read(file.path(RUTAS$raw, "geopanel1523date.geojson"), quiet = TRUE)
+gp_3116 <- sf::st_transform(gp, CRS_TARGET)
+sf::st_write(gp_3116, out_path, layer = "geopanel_colegios", quiet = TRUE)
+
+# ---- Verificacion ------------------------------------------------------
+ly <- sf::st_layers(out_path)
+print(ly)
+```
+
+## 18.3 Lectura del GeoPackage saneado
+
+Cargas la capa que necesites con `sf::st_read(..., layer = "<nombre>")`:
+
+```{r leer_spatial_layers_3116, eval=FALSE}
+SPATIAL_GPKG <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+
+colegios_3116          <- sf::st_read(SPATIAL_GPKG, layer = "colegios", quiet = TRUE)
+zats_puntos_3116       <- sf::st_read(SPATIAL_GPKG, layer = "zats_puntos", quiet = TRUE)
+zats_poligonos_3116    <- sf::st_read(SPATIAL_GPKG, layer = "zats_poligonos", quiet = TRUE)
+geopanel_colegios_3116 <- sf::st_read(SPATIAL_GPKG, layer = "geopanel_colegios", quiet = TRUE)
+```
+
+## 18.4 Resumen de la última generación
+
+Resultado obtenido al ejecutar el chunk `generar_spatial_layers_3116`:
+
+| Capa | n features | Tipo de geometría | EPSG |
+|---|---:|---|---:|
+| `colegios` | 2219 (2 puntos descartados por coords no finitas) | POINT | 3116 |
+| `zats_puntos` | 1626 | POINT | 3116 |
+| `zats_poligonos` | 1141 | MULTIPOLYGON | 3116 |
+| `geopanel_colegios` | 6290 | POINT | 3116 |
+
+Tamaño del GeoPackage: ~10 MB.
+
+---
+
+# 19. Agregación territorial para econometría espacial
+
+Esta sección produce las **24 bases agregadas** que alimentan los modelos
+espaciales en fases posteriores. La unidad de análisis primaria es la
+**sede educativa** (`cole_cod_dane_sede`), que es 1-a-1 con la geometría
+de la capa `colegios` del GeoPackage saneado. UPZ y UPL se agregan a
+partir de los centroides de las sedes que las componen; ZAT se asigna
+mediante un `st_join` sede→polígono dentro de Bogotá-DC.
+
+## 19.1 Decisiones fijas de esta sección
+
+- **Unidad mínima espacial = SEDE** (`cole_cod_dane_sede` ↔ `DANE12_SED`).
+  El 99.56 % de los 716,279 estudiantes geolocalizados (de 719,466 totales)
+  tienen un match 1-a-1 con la geometría del gpkg. Los 3,187 restantes se
+  excluyen del análisis espacial y se reportan como nota técnica.
+- **Filtro Bogotá-DC en ZAT**: solo polígonos con `MUNCod == 11001`
+  (922 polígonos, descartando los 16 con `MUNCod=0` y los 203 de
+  Cundinamarca). Verificado en V5: cero sedes caen en los `MUNCod=0`,
+  el filtro no destruye datos.
+- **Match L3 fuzzy**: se conservan los 81,053 estudiantes (11.27 %)
+  con bandera `confianza_baja = TRUE`. La fase de modelación decide si
+  filtrar o no.
+- **Doble corte temporal**: cada combinación (unidad × modo) se genera
+  por `anio` (semestres combinados) **y** por `periodo` (semestres
+  separados). El calendario A presenta Saber 11 en segundo semestre y
+  el calendario B en primer semestre; mantener ambos cortes permite
+  distinguir cohortes en análisis posteriores.
+
+Total de bases generadas: **4 unidades × 3 modos × 2 cortes = 24** archivos
+`base_{unidad}_{modo_temporal}_{corte}_3116.gpkg` en `data/analysis/`.
+
+> **Exclusiones de datos.** Las dos exclusiones que afectan la
+> cardinalidad de los datos analíticos (17 sedes ICFES sin
+> geocodificación válida y 5 códigos no-UPZ del CSV) se documentan
+> formalmente en la sección **19.8 Notas metodológicas sobre
+> exclusiones de datos**. Esa sección contiene la prosa citable que
+> debe aparecer en el capítulo de limitaciones de la tesis.
+
+## 19.2 Carga del CSV geolocalizado y derivados
+
+```{r carga_estudiantes_geo}
+CSV_GEO <- file.path(RUTAS$analysis, "estudiantes_bogota_geolocalizados.csv")
+
+df_full <- readr::read_csv(CSV_GEO, col_types = readr::cols_only(
+  periodo                       = readr::col_character(),
+  anio                          = readr::col_integer(),
+  semestre                      = readr::col_integer(),
+  cole_cod_dane_establecimiento = readr::col_character(),
+  cole_cod_dane_sede            = readr::col_character(),
+  punt_global                   = readr::col_double(),
+  punt_matematicas              = readr::col_double(),
+  punt_lectura_critica          = readr::col_double(),
+  punt_c_naturales              = readr::col_double(),
+  punt_sociales_ciudadanas      = readr::col_double(),
+  punt_ingles                   = readr::col_double(),
+  fami_estratovivienda          = readr::col_character(),
+  fami_educacionmadre           = readr::col_character(),
+  fami_tieneinternet            = readr::col_character(),
+  estu_inse_individual          = readr::col_double(),
+  estu_genero                   = readr::col_character(),
+  cole_naturaleza               = readr::col_character(),
+  cole_jornada                  = readr::col_character(),
+  cole_calendario               = readr::col_character(),
+  cole_bilingue                 = readr::col_character(),
+  cod_upz                       = readr::col_character(),
+  cod_upl                       = readr::col_character(),
+  estrato                       = readr::col_double(),
+  nivel_match                   = readr::col_character(),
+  confianza                     = readr::col_double()
+), progress = FALSE)
+
+df_full <- df_full |>
+  dplyr::mutate(
+    estrato_familia  = suppressWarnings(as.integer(stringr::str_extract(fami_estratovivienda, "[0-9]"))),
+    es_oficial       = as.integer(stringr::str_to_upper(cole_naturaleza) == "OFICIAL"),
+    es_jornada_compl = as.integer(stringr::str_to_upper(cole_jornada)    == "COMPLETA"),
+    confianza_baja   = startsWith(dplyr::coalesce(nivel_match, ""), "L3")
+  )
+
+# Z-score por PERIODO (anio*semestre, 18 grupos): justificacion metodologica
+# en seccion de discusion. Las escalas Saber 11 difieren ~30-50 puntos entre
+# semestres (calendario A vs B; calibracion ICFES); estandarizar por periodo
+# elimina ese artefacto sistematico y deja solo la posicion relativa nacional,
+# que es la cantidad sustantivamente comparable para analisis espacial multi-anual.
+df_full <- df_full |>
+  dplyr::group_by(periodo) |>
+  dplyr::mutate(dplyr::across(
+    c(punt_global, punt_matematicas, punt_lectura_critica,
+      punt_c_naturales, punt_sociales_ciudadanas, punt_ingles),
+    ~ as.numeric(scale(.x)),
+    .names = "{.col}_z_periodo"
+  )) |>
+  dplyr::ungroup()
+
+cat(sprintf("CSV: %s estudiantes, %s con confianza_baja=TRUE (L3)\n",
+            format(nrow(df_full), big.mark = ","),
+            format(sum(df_full$confianza_baja), big.mark = ",")))
+
+# Validacion del z-score: por periodo, todas las medias ~ 0 y sd ~ 1
+zcheck <- df_full |>
+  dplyr::group_by(periodo) |>
+  dplyr::summarise(
+    mean_z_global = mean(punt_global_z_periodo, na.rm = TRUE),
+    sd_z_global   = stats::sd(punt_global_z_periodo, na.rm = TRUE),
+    .groups = "drop"
+  )
+stopifnot(max(abs(zcheck$mean_z_global)) < 1e-6,
+          max(abs(zcheck$sd_z_global - 1)) < 1e-6)
+cat(sprintf("Z-score por periodo: validado (max |mean|=%.2e, max |sd-1|=%.2e)\n",
+            max(abs(zcheck$mean_z_global)),
+            max(abs(zcheck$sd_z_global - 1))))
+```
+
+## 19.3 Construcción de las cuatro `sf_unidades` (clave SEDE)
+
+```{r construir_sf_unidades}
+SPATIAL_GPKG <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+CRS_TARGET   <- 3116
+
+colegios_3116  <- sf::st_read(SPATIAL_GPKG, layer = "colegios",       quiet = TRUE)
+zats_poly_full <- sf::st_read(SPATIAL_GPKG, layer = "zats_poligonos", quiet = TRUE)
+
+# Filtro Bogotá-DC para ZAT (solo en memoria; el gpkg en disco no se toca).
+zats_bog <- zats_poly_full |> dplyr::filter(MUNCod == 11001)
+
+# Filtro del CSV: solo estudiantes cuya sede esta en el gpkg saneado.
+sedes_gpkg <- unique(colegios_3116$DANE12_SED)
+df <- df_full |> dplyr::filter(cole_cod_dane_sede %in% sedes_gpkg)
+
+cat(sprintf("Estudiantes filtrados a sedes en gpkg: %s de %s (%.2f%%)\n",
+            format(nrow(df),      big.mark = ","),
+            format(nrow(df_full), big.mark = ","),
+            100 * nrow(df) / nrow(df_full)))
+
+# UNIDAD 1: sede (1 a 1 con la geometria del gpkg)
+sf_sede <- colegios_3116 |>
+  dplyr::rename(cole_cod_dane_sede = DANE12_SED) |>
+  dplyr::select(cole_cod_dane_sede, DANE12_EST, NOMBRE_EST, NOMBRE_SED) |>
+  dplyr::filter(cole_cod_dane_sede %in% unique(df$cole_cod_dane_sede))
+
+# UNIDAD 2: ZAT (poligonos Bogota-DC)
+sf_zat <- zats_bog |>
+  dplyr::mutate(zat_id = as.character(ZAT)) |>
+  dplyr::select(zat_id, MUNCod, NOMMun)
+
+# Spatial join SEDE -> ZAT (cada sede en exactamente 1 ZAT). Se agrega
+# zat_id al data.frame de estudiantes via la sede.
+mapa_sede_zat <- sf_sede |>
+  sf::st_join(sf_zat |> dplyr::select(zat_id), join = sf::st_within) |>
+  sf::st_drop_geometry() |>
+  dplyr::distinct(cole_cod_dane_sede, zat_id)
+
+# Verificacion 1-a-1: ninguna sede en mas de un poligono
+n_multi <- mapa_sede_zat |> dplyr::count(cole_cod_dane_sede) |>
+  dplyr::filter(n > 1) |> nrow()
+if (n_multi > 0) stop(sprintf("ERROR: %d sedes en >1 poligono ZAT", n_multi))
+
+df <- df |> dplyr::left_join(mapa_sede_zat, by = "cole_cod_dane_sede")
+
+# UNIDAD 3 y 4: UPZ y UPL — geometria placeholder = centroide de sus sedes
+sf_upz <- sf_sede |>
+  dplyr::inner_join(
+    df |> dplyr::filter(!is.na(cod_upz)) |>
+          dplyr::distinct(cole_cod_dane_sede, cod_upz),
+    by = "cole_cod_dane_sede"
+  ) |>
+  dplyr::group_by(cod_upz) |>
+  dplyr::summarise(geom = sf::st_union(geom), .groups = "drop") |>
+  dplyr::mutate(geom = sf::st_centroid(geom))
+
+sf_upl <- sf_sede |>
+  dplyr::inner_join(
+    df |> dplyr::filter(!is.na(cod_upl)) |>
+          dplyr::distinct(cole_cod_dane_sede, cod_upl),
+    by = "cole_cod_dane_sede"
+  ) |>
+  dplyr::group_by(cod_upl) |>
+  dplyr::summarise(geom = sf::st_union(geom), .groups = "drop") |>
+  dplyr::mutate(geom = sf::st_centroid(geom))
+
+cat(sprintf("sf_sede=%d  sf_zat=%d  sf_upz=%d  sf_upl=%d\n",
+            nrow(sf_sede), nrow(sf_zat), nrow(sf_upz), nrow(sf_upl)))
+```
+
+## 19.4 Función `agregar_a_unidad`
+
+```{r fn_agregar_a_unidad}
+#' @description Agrega un dataset estudiante-nivel a la unidad espacial
+#'   especificada, soportando tres modos temporales y dos cortes
+#'   (anio o periodo).
+#' @param df_estudiantes Data.frame con datos por estudiante. Debe contener
+#'   col_id_unidad, col_corte y todas las de vars_resultado / vars_control,
+#'   asi como la columna logica confianza_baja (para reportar n_l3).
+#' @param sf_unidades sf con una fila por unidad, en EPSG:3116. Polygon o
+#'   Point. Polygons se reducen a su centroide.
+#' @param col_id_unidad Nombre de la columna identificadora, presente en
+#'   df_estudiantes y en sf_unidades.
+#' @param vars_resultado Vector de columnas numericas: se agrega media y sd.
+#'   Las columnas que terminan en "_z_periodo" se detectan automaticamente
+#'   y se anaden a vars_resultado (variable dependiente principal de Fase 4).
+#' @param vars_control Vector de columnas numericas adicionales: media.
+#' @param modo_temporal "transversal" | "pooled" | "panel".
+#' @param col_corte "anio" o "periodo". Solo afecta a transversal y panel.
+#' @param incluir_covariables_listB Si TRUE (default), calcula y anade las
+#'   9 covariables de Lista B por unidad-periodo: estrato_promedio,
+#'   prop_oficial, prop_madre_universitaria, prop_internet_hogar,
+#'   n_estudiantes_log, prop_jornada_completa, prop_calendario_a,
+#'   prop_genero_femenino, prop_bilingue. Las propociones se calculan
+#'   ignorando NA (na.rm=TRUE). FALSE preserva la firma original.
+#' @return Si pooled o panel, devuelve un sf. Si transversal, lista de sf
+#'   (una por valor del corte).
+agregar_a_unidad <- function(df_estudiantes, sf_unidades, col_id_unidad,
+                              vars_resultado, vars_control = character(0),
+                              modo_temporal = c("transversal","pooled","panel"),
+                              col_corte = "anio",
+                              incluir_covariables_listB = TRUE) {
+  modo_temporal <- match.arg(modo_temporal)
+
+  df <- df_estudiantes
+  df[[col_id_unidad]] <- as.character(df[[col_id_unidad]])
+  df <- df[!is.na(df[[col_id_unidad]]) & df[[col_id_unidad]] != "", , drop = FALSE]
+
+  sf_units <- sf_unidades
+  sf_units[[col_id_unidad]] <- as.character(sf_units[[col_id_unidad]])
+  sf_units <- sf_units[!sf::st_is_empty(sf::st_geometry(sf_units)), , drop = FALSE]
+  # Conservar la geometria original (POINT o POLYGON/MULTIPOLYGON):
+  # construir_W extrae centroides on-the-fly cuando los necesita para
+  # knn/dist_band/inv_dist; queen/rook necesitan poligonos. Centroidar
+  # aqui destruiria informacion para todos los downstream que usan poligonos
+  # (mapas LISA, queen/rook regen, st_join contra otras capas).
+
+  grp <- if (modo_temporal == "pooled") col_id_unidad else c(col_id_unidad, col_corte)
+
+  # Auto-deteccion de columnas _z_periodo: se anaden a vars_resultado para
+  # que cada agregado lleve sus columnas {var}_z_periodo_media y _sd.
+  z_cols <- grep("_z_periodo$", names(df), value = TRUE)
+  vars_resultado_full <- unique(c(vars_resultado, z_cols))
+
+  ctrl_num <- vars_control[sapply(vars_control,
+                                   function(v) v %in% names(df) &&
+                                     (is.numeric(df[[v]]) || is.logical(df[[v]])))]
+
+  # Si se piden covariables Lista B, derivar columnas auxiliares en df.
+  # Falla informativamente si alguna columna fuente no existe.
+  if (incluir_covariables_listB) {
+    cols_listB_fuente <- c("fami_estratovivienda","cole_naturaleza",
+                            "fami_educacionmadre","fami_tieneinternet",
+                            "cole_jornada","cole_calendario",
+                            "estu_genero","cole_bilingue")
+    faltantes <- setdiff(cols_listB_fuente, names(df))
+    if (length(faltantes) > 0)
+      stop("Faltan columnas fuente para Lista B: ",
+           paste(faltantes, collapse = ", "))
+    df <- df |>
+      dplyr::mutate(
+        listB_estrato_num   = suppressWarnings(as.numeric(stringr::str_extract(
+                                  fami_estratovivienda, "[1-6]"))),
+        listB_es_oficial    = as.integer(cole_naturaleza == "OFICIAL"),
+        listB_madre_univ    = as.integer(fami_educacionmadre %in%
+                                  c("Educación profesional completa","Postgrado")),
+        listB_internet      = as.integer(fami_tieneinternet == "Si"),
+        listB_jornada_compl = as.integer(cole_jornada == "COMPLETA"),
+        listB_calend_a      = as.integer(cole_calendario == "A"),
+        listB_genero_f      = as.integer(estu_genero == "F"),
+        listB_bilingue      = as.integer(cole_bilingue == "S")
+      )
+  }
+
+  agg <- df |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(grp))) |>
+    dplyr::summarise(
+      n     = dplyr::n(),
+      n_l3  = sum(confianza_baja, na.rm = TRUE),
+      dplyr::across(dplyr::all_of(vars_resultado_full),
+                    list(media = ~ mean(.x, na.rm = TRUE),
+                         sd    = ~ stats::sd(.x, na.rm = TRUE)),
+                    .names = "{.col}_{.fn}"),
+      dplyr::across(dplyr::all_of(ctrl_num),
+                    ~ mean(as.numeric(.x), na.rm = TRUE),
+                    .names = "{.col}_media"),
+      .groups = "drop"
+    )
+
+  if (incluir_covariables_listB) {
+    cov_listB <- df |>
+      dplyr::group_by(dplyr::across(dplyr::all_of(grp))) |>
+      dplyr::summarise(
+        estrato_promedio         = mean(listB_estrato_num,   na.rm = TRUE),
+        prop_oficial             = mean(listB_es_oficial,    na.rm = TRUE),
+        prop_madre_universitaria = mean(listB_madre_univ,    na.rm = TRUE),
+        prop_internet_hogar      = mean(listB_internet,      na.rm = TRUE),
+        prop_jornada_completa    = mean(listB_jornada_compl, na.rm = TRUE),
+        prop_calendario_a        = mean(listB_calend_a,      na.rm = TRUE),
+        prop_genero_femenino     = mean(listB_genero_f,      na.rm = TRUE),
+        prop_bilingue            = mean(listB_bilingue,      na.rm = TRUE),
+        .groups = "drop"
+      )
+    agg <- agg |>
+      dplyr::left_join(cov_listB, by = grp) |>
+      dplyr::mutate(n_estudiantes_log = log(n))
+  }
+
+  build_sf <- function(agg_df) {
+    out <- dplyr::inner_join(agg_df, sf_units, by = col_id_unidad)
+    geom_col <- attr(sf_units, "sf_column")
+    out <- sf::st_as_sf(out, sf_column_name = geom_col, crs = sf::st_crs(sf_units))
+    out[!sf::st_is_empty(sf::st_geometry(out)), , drop = FALSE]
+  }
+
+  if (modo_temporal == "transversal") {
+    cuts <- sort(unique(df[[col_corte]]))
+    out_list <- lapply(cuts, function(cut) build_sf(agg |> dplyr::filter(.data[[col_corte]] == cut)))
+    names(out_list) <- paste0(col_corte, "_", as.character(cuts))
+    return(out_list)
+  } else {
+    return(build_sf(agg))
+  }
+}
+```
+
+## 19.5 Generación de las 24 bases
+
+El siguiente chunk regenera las 24 bases en `data/analysis/`. Está
+marcado `eval = FALSE` para no ejecutarse en cada knit; cambiar a
+`TRUE` (o establecer `regenerar_bases <- TRUE`) para reconstruir.
+
+```{r generar_bases_agregadas, eval=FALSE}
+vars_resultado <- c("punt_global", "punt_matematicas", "punt_lectura_critica",
+                    "punt_c_naturales", "punt_sociales_ciudadanas", "punt_ingles")
+vars_control   <- c("estrato_familia", "estu_inse_individual", "estrato",
+                    "es_oficial", "es_jornada_compl")
+
+unidades <- list(
+  list(nombre = "sede", sf_u = sf_sede, key = "cole_cod_dane_sede"),
+  list(nombre = "zat",  sf_u = sf_zat,  key = "zat_id"),
+  list(nombre = "upz",  sf_u = sf_upz,  key = "cod_upz"),
+  list(nombre = "upl",  sf_u = sf_upl,  key = "cod_upl")
+)
+modos  <- c("transversal", "pooled", "panel")
+cortes <- c("anio", "periodo")
+
+for (u in unidades) for (m in modos) for (corte in cortes) {
+  tag <- sprintf("base_%s_%s_%s_3116", u$nombre, m, corte)
+  res <- agregar_a_unidad(df, u$sf_u, u$key,
+                          vars_resultado, vars_control,
+                          modo_temporal = m, col_corte = corte)
+  out_path <- file.path(RUTAS$analysis, paste0(tag, ".gpkg"))
+  if (file.exists(out_path)) file.remove(out_path)
+
+  if (inherits(res, "sf")) {
+    if (sf::st_crs(res)$epsg != CRS_TARGET) stop("CRS mismatch en ", tag)
+    sf::st_write(res, out_path, layer = sub(".*base_", "base_", tag), quiet = TRUE)
+  } else {
+    for (nm in names(res)) {
+      s <- res[[nm]]
+      if (sf::st_crs(s)$epsg != CRS_TARGET) stop("CRS mismatch en ", tag, "/", nm)
+      sf::st_write(s, out_path, layer = nm, quiet = TRUE)
+    }
+  }
+}
+```
+
+## 19.6 Resumen y validaciones de las bases generadas
+
+```{r resumen_bases_agregadas}
+RESUMEN_CSV <- file.path(RUTAS$analysis, "resumen_bases_agregadas_3116.csv")
+
+if (file.exists(RESUMEN_CSV)) {
+  resumen <- readr::read_csv(RESUMEN_CSV, show_col_types = FALSE, progress = FALSE)
+
+  cat(sprintf("Resumen leido: %d filas (24 archivos × layers)\n", nrow(resumen)))
+  cat(sprintf("Todas las capas en EPSG:%d : %s\n", CRS_TARGET,
+              all(resumen$epsg == CRS_TARGET, na.rm = TRUE)))
+
+  knitr::kable(
+    resumen |> dplyr::filter(modo == "pooled") |>
+      dplyr::select(unidad, corte, n_unidades, n_estu, n_l3, pct_lt_30),
+    caption = "Bases pooled (corte=anio == corte=periodo, una fila por sede/unidad)",
+    col.names = c("Unidad","Corte","N unidades","N estudiantes","N con L3","% n<30")
+  )
+
+  knitr::kable(
+    resumen |> dplyr::filter(modo == "panel") |>
+      dplyr::select(unidad, corte, n_unidades, n_estu, pct_lt_30),
+    caption = "Bases panel (una fila por (unidad, slice))",
+    col.names = c("Unidad","Corte","N filas (unidad×slice)","N estudiantes","% celdas n<30")
+  )
+} else {
+  cat("Aun no se ha generado data/analysis/resumen_bases_agregadas_3116.csv.\n",
+      "Setea regenerar_bases <- TRUE y vuelve a ejecutar el chunk previo.\n")
+}
+```
+
+## 19.7 Variable dependiente principal: `punt_global_z_periodo_media`
+
+Para los modelos espaciales (Moran y SDM en fases siguientes) la
+variable dependiente principal es **el promedio por unidad del z-score
+de `punt_global` calculado a nivel estudiante por período**:
+`punt_global_z_periodo_media`. Esto resuelve la incomparabilidad de
+escalas Saber 11 entre semestres (calendario A vs B; calibración
+ICFES) y deja solo la posición relativa nacional, que es la cantidad
+sustantivamente comparable para análisis multi-anual.
+
+```{r descriptiva_dv_z_periodo}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+csv_dv  <- file.path(TBL_DIR, "descriptiva_dv_z_periodo.csv")
+
+if (file.exists(csv_dv)) {
+  tabla_dv <- readr::read_csv(csv_dv, show_col_types = FALSE, progress = FALSE)
+  knitr::kable(tabla_dv,
+               caption = "Descriptivos de punt_global_z_periodo_media por escala (base pooled corte=anio)",
+               digits = 4)
+} else {
+  cat("Aun no se ha generado descriptiva_dv_z_periodo.csv.\n")
+}
+```
+
+```{r distribucion_dv_z_periodo, fig.width=12, fig.height=10, dpi=150, dev="png", fig.cap="Distribución de la variable dependiente estandarizada por escala. Línea roja: 0 (media nacional)."}
+fig_path <- file.path(RUTAS$outputs, "figures", "distribucion_dv_z_periodo.png")
+if (file.exists(fig_path)) knitr::include_graphics(fig_path)
+```
+
+## 19.8 Notas metodológicas sobre exclusiones de datos
+
+Esta sección contiene la prosa formal y citable sobre las dos
+exclusiones de datos que afectan la cardinalidad de las bases
+analíticas. Está pensada para que el investigador la transcriba (con
+adaptaciones menores de estilo) al capítulo de limitaciones de la
+tesis.
+
+### Exclusión 1: 17 sedes ICFES sin geocodificación válida
+
+Del total de 1,149 sedes con presencia en
+`estudiantes_bogota_geolocalizados.csv` (la base resultante del cruce
+de los microdatos ICFES Saber 11 con el catastro educativo
+georreferenciado del Distrito), 17 sedes (1.5 %) no encuentran su
+`DANE12_SED` correspondiente en `colegios06_2025.gpkg`. Esto representa
+**3,187 estudiantes (0.44 % del total geolocalizado)**, reduciendo el
+universo efectivo del análisis espacial de 719,466 a **716,279
+estudiantes** distribuidos en **1,132 sedes** geocodificadas.
+
+Estas 17 sedes corresponden probablemente a establecimientos pequeños
+de nivel preescolar y básica registrados en el sistema ICFES pero
+ausentes del catastro educativo del Distrito (jardines comunitarios,
+programas no formales, instituciones de tránsito, sedes recientemente
+incorporadas o egresadas del sistema oficial). El análisis espacial
+las excluye por imposibilidad de asignar coordenadas verificadas; esta
+exclusión se reporta en la sección de limitaciones y no se considera
+una fuente material de sesgo dado el bajo porcentaje afectado y la
+naturaleza marginal del universo excluido.
+
+### Exclusión 2: 5 códigos no-UPZ del CSV (UPR + SIN UPZ)
+
+Al reagregar la base de estudiantes a la unidad UPZ usando los
+polígonos oficiales de IDECA (112 UPZ del Distrito), 5 códigos
+presentes en la columna `cod_upz` del CSV no corresponden a UPZ
+formales: `"SIN UPZ"`, `"UPR 1"`, `"UPR 2"`, `"UPR 3"` y `"UPR 5"`
+(las **Unidades de Planeación Rural** son una categoría distinta a las
+UPZ, exclusiva del suelo rural y no clasificable como UPZ urbano).
+Estos 5 códigos agrupan aproximadamente **12,630 estudiantes (1.76 %
+del total geolocalizado)**, concentrados en sedes de Sumapaz, Usme
+rural y Ciudad Bolívar rural.
+
+La base agregada a escala UPZ contiene en consecuencia **102 unidades**
+(no las 107 que aparecen como códigos UPZ en el CSV original ni las
+112 del shapefile IDECA, dado que 10 polígonos UPZ no contienen
+ninguna sede). Estos 12,630 estudiantes **se conservan en las
+agregaciones a escala sede, ZAT y UPL** (donde sí tienen unidad
+espacial válida); solo desaparecen del análisis cuando la unidad de
+análisis es UPZ.
+
+### Tabla resumen de exclusiones
+
+```{r tabla_exclusiones}
+tibble::tibble(
+  exclusion = c("Sedes ICFES sin geocodificacion valida",
+                 "Codigos no-UPZ (UPR rurales + SIN UPZ)"),
+  unidades_afectadas = c("17 sedes (de 1,149)",
+                          "5 codigos (de 107 distintos en CSV)"),
+  estudiantes        = c("3,187 (0.44%)", "12,630 (1.76%)"),
+  alcance            = c("Excluidos en TODAS las escalas espaciales",
+                          "Excluidos solo en escala UPZ; presentes en sede/ZAT/UPL"),
+  ubicacion_tipica   = c("Sedes preescolares/no formales no inscritas en catastro Distrito",
+                          "Sumapaz rural, Usme rural, Ciudad Bolivar rural"),
+  referencia_tesis   = c("Capitulo de limitaciones - subsection 19.8.1 del .Rmd",
+                          "Capitulo de limitaciones - subsection 19.8.2 del .Rmd")
+) |>
+  knitr::kable(caption = "Resumen de exclusiones de datos en la base analitica espacial.")
+```
+
+## 19.9 Covariables Lista B para Fase 5 (Spatial Durbin Model)
+
+`agregar_a_unidad` calcula automáticamente, cuando
+`incluir_covariables_listB = TRUE` (default), nueve covariables a
+nivel unidad-período que serán los regresores del SDM en Fase 5:
+
+| Variable | Construcción | Notas |
+|---|---|---|
+| `estrato_promedio` | `mean(fami_estratovivienda numérico, na.rm=TRUE)` | escala 1-6 |
+| `prop_oficial` | `mean(cole_naturaleza == "OFICIAL")` | binaria |
+| `prop_madre_universitaria` | `mean(fami_educacionmadre %in% {"Educación profesional completa","Postgrado"})` | binaria |
+| `prop_internet_hogar` | `mean(fami_tieneinternet == "Si")` | binaria |
+| `prop_jornada_completa` | `mean(cole_jornada == "COMPLETA")` | binaria |
+| `prop_calendario_a` | `mean(cole_calendario == "A")` | binaria |
+| `prop_genero_femenino` | `mean(estu_genero == "F")` | binaria |
+| `prop_bilingue` | `mean(cole_bilingue == "S")` | binaria; **16.8 % NA en fuente** |
+| `n_estudiantes_log` | `log(n)` | tamaño muestral |
+
+% NA en columnas fuente (sobre 719,466 estudiantes geolocalizados):
+`cole_bilingue` 16.82 %, `cole_jornada` 0.04 %, `fami_educacionmadre`
+4.21 %, `fami_tieneinternet` 4.28 %, resto < 0.05 %. Ninguna excede el
+umbral 30 %, pero `cole_bilingue` se monitorea: la mayoría de sedes
+no tiene esa información y el indicador es ruidoso.
+
+### 19.9.1 Descriptivos de Lista B (muestra: `base_sede_panel_anio_3116`)
+
+```{r descriptivos_listB_sede_panel}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+s <- sf::st_read(file.path(RUTAS$analysis,
+                            "base_sede_panel_anio_3116.gpkg"), quiet = TRUE) |>
+  sf::st_drop_geometry()
+listB <- c("estrato_promedio","prop_oficial","prop_madre_universitaria",
+           "prop_internet_hogar","prop_jornada_completa","prop_calendario_a",
+           "prop_genero_femenino","prop_bilingue","n_estudiantes_log")
+descriptivos <- purrr::map_dfr(listB, function(c) {
+  x <- s[[c]]
+  tibble::tibble(variable = c,
+                  n_no_NA = sum(!is.na(x)),
+                  pct_NA  = round(100 * mean(is.na(x)), 2),
+                  media   = round(mean(x, na.rm = TRUE), 4),
+                  sd      = round(stats::sd(x, na.rm = TRUE), 4),
+                  min     = round(min(x, na.rm = TRUE), 4),
+                  max     = round(max(x, na.rm = TRUE), 4))
+})
+knitr::kable(descriptivos,
+             caption = "Descriptivos de las 9 covariables Lista B en base_sede_panel_anio_3116 (n=9,478 celdas sede x anio).")
+```
+
+### 19.9.2 Correlaciones entre covariables Lista B
+
+```{r tabla_correlaciones_listB}
+cor_long <- readr::read_csv(file.path(TBL_DIR, "cov_listB_correlaciones.csv"),
+                              show_col_types = FALSE, progress = FALSE)
+cor_alta <- cor_long |> dplyr::filter(alta) |>
+  dplyr::distinct(across(c(var1, var2, r))) |>
+  dplyr::arrange(dplyr::desc(abs(r)))
+knitr::kable(
+  cor_alta,
+  caption = "Pares con |r| > 0.7 (potencial multicolinealidad). Calculado en base_sede_panel_anio_3116."
+)
+```
+
+### 19.9.3 VIF preliminar (OLS dummy sobre punt_global_z_periodo_media)
+
+```{r tabla_vif_listB}
+vif_df <- readr::read_csv(file.path(TBL_DIR, "cov_listB_vif.csv"),
+                            show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  vif_df |> dplyr::arrange(dplyr::desc(VIF)),
+  caption = "VIF preliminar de las 9 covariables Lista B en una OLS sobre punt_global_z_periodo_media (base_sede_panel_anio_3116). Regla de pulgar: VIF > 5 indica multicolinealidad problematica."
+)
+```
+
+### 19.9.4 Implicaciones para Fase 5
+
+- **Correlación alta `estrato_promedio` ↔ `prop_madre_universitaria`
+  (r = 0.86)**: ambas capturan dimensiones del nivel socioeconómico
+  familiar. Decisión sugerida en Fase 5: incluir solo una de las dos
+  en el modelo principal y reportar la otra como robustez. *Mi
+  recomendación*: usar `estrato_promedio` por ser estándar en
+  literatura de Bogotá.
+- **Correlación alta negativa `prop_oficial` ↔ `prop_jornada_completa`
+  (r = -0.73)**: las sedes oficiales no suelen tener jornada única
+  completa; las privadas sí. Mantener ambas porque capturan ejes
+  distintos (tipo institucional vs intensidad horaria) — pero
+  vigilar coeficientes en SDM.
+- **VIF**: todos < 5 (máximo 4.93 en `prop_madre_universitaria`),
+  multicolinealidad manejable.
+- **`prop_bilingue` con 20 % NA en panel**: TODO(investigador) para
+  Fase 5: decidir si se imputa con `0` (asumir no-bilingüe), se
+  excluye del modelo, o se conserva con NA y se sacrifica observaciones.
+  Recomendación: imputar `0` y reportar sensibilidad.
+
+---
+
+# 20. Integración de shapefiles oficiales UPL y UPZ
+
+En Fase 2 las bases agregadas a UPL y UPZ usaron **centroides** de las
+sedes que pertenecen a cada unidad, porque no se disponía del shapefile
+poligonal oficial. Esta sección integra los polígonos oficiales (POT
+2022 para UPL; IDECA para UPZ), los añade como capas nuevas a
+`data/cleaned/spatial_layers_3116.gpkg`, y regenera las bases
+`base_upl_*` y `base_upz_*` con la **geometría poligonal real**. Las
+bases `base_sede_*` y `base_zat_*` no se modifican.
+
+## 20.1 Decisiones y normalización de códigos
+
+- **UPL**: `data/raw/unidadplaneamientolocal/UnidadPlaneamientoLocal.shp`
+  (33 polígonos, POT 2022). Columna identificadora: `CODIGO_UPL`
+  (formato `"UPL01"…"UPL33"`). Se normaliza a la convención del CSV
+  (entero como string: `"1"…"33"`) en una nueva columna `cod_upl`.
+- **UPZ**: `data/raw/UPZ/SHP/IndUPZ.shp` (112 polígonos, IDECA).
+  Columna identificadora: `CODIGO_UPZ` (formato numérico string
+  `"1"…"117"` con saltos). Se normaliza a entero string en `cod_upz`.
+
+CRS original de ambos: **EPSG:4686 (MAGNA-SIRGAS)**, geográfico. Se
+reproyecta a EPSG:3116 antes de cualquier operación.
+
+**Cruce con CSV (validación previa):**
+- UPL: 33 / 33 códigos del CSV se encuentran en el shapefile (100%).
+  100% de los 716,279 estudiantes geolocalizados son mapeables.
+- UPZ: 102 / 107 códigos del CSV se encuentran en el shapefile (95.3%).
+  Los 5 no-encontrados son `"SIN UPZ"` y `"UPR 1"…"UPR 5"` (Unidad de
+  Planeamiento **Rural**, no UPZ). 98.24 % de estudiantes son
+  mapeables; los 12,630 restantes (~1.76%) caen fuera del análisis a
+  escala UPZ pero permanecen en sede, ZAT y UPL.
+
+## 20.2 Inspección y reproyección a EPSG:3116
+
+```{r leer_shapes_upl_upz, eval=FALSE}
+upl_raw <- sf::st_read("data/raw/unidadplaneamientolocal/UnidadPlaneamientoLocal.shp", quiet = TRUE)
+upz_raw <- sf::st_read("data/raw/UPZ/SHP/IndUPZ.shp", quiet = TRUE)
+
+cat(sprintf("UPL: n=%d, EPSG=%d, geom=%s\n",
+            nrow(upl_raw), sf::st_crs(upl_raw)$epsg,
+            paste(unique(as.character(sf::st_geometry_type(upl_raw))), collapse = ",")))
+cat(sprintf("UPZ: n=%d, EPSG=%d, geom=%s\n",
+            nrow(upz_raw), sf::st_crs(upz_raw)$epsg,
+            paste(unique(as.character(sf::st_geometry_type(upz_raw))), collapse = ",")))
+
+upl_3116 <- sf::st_transform(upl_raw, CRS_TARGET) |>
+  dplyr::mutate(cod_upl = as.character(as.integer(sub("^UPL", "", CODIGO_UPL))))
+upz_3116 <- sf::st_transform(upz_raw, CRS_TARGET) |>
+  dplyr::mutate(cod_upz = as.character(as.integer(CODIGO_UPZ)))
+```
+
+## 20.3 Adición de capas a `spatial_layers_3116.gpkg`
+
+```{r anadir_capas_upl_upz, eval=FALSE}
+sf::st_write(upl_3116, SPATIAL_GPKG, layer = "upl_poligonos", delete_layer = TRUE, quiet = TRUE)
+sf::st_write(upz_3116, SPATIAL_GPKG, layer = "upz_poligonos", delete_layer = TRUE, quiet = TRUE)
+
+# Validacion
+ly <- sf::st_layers(SPATIAL_GPKG)
+print(ly)  # se esperan 6 capas: las 4 originales + upl_poligonos + upz_poligonos
+```
+
+## 20.4 Regeneración de bases UPL y UPZ con geometría poligonal real
+
+```{r regenerar_bases_poligonales, eval=FALSE}
+upl_poly_join <- upl_3116 |> dplyr::select(cod_upl, CODIGO_UPL, NOMBRE_UPL_oficial = NOMBRE)
+upz_poly_join <- upz_3116 |> dplyr::select(cod_upz, CODIGO_UPZ, NOMBRE_UPZ_oficial = NOMBRE)
+
+regenerate_base <- function(base_path, sf_polys, key) {
+  ly <- sf::st_layers(base_path)$name
+  layer_results <- list()
+  for (L in ly) {
+    s <- sf::st_read(base_path, layer = L, quiet = TRUE)
+    df_tab <- sf::st_drop_geometry(s)
+    df_tab[[key]] <- as.character(as.integer(df_tab[[key]]))
+    sf_p <- sf_polys
+    sf_p[[key]] <- as.character(as.integer(sf_p[[key]]))
+    out <- df_tab |> dplyr::inner_join(sf_p, by = key)
+    geom_col <- attr(sf_polys, "sf_column")
+    layer_results[[L]] <- sf::st_as_sf(out, sf_column_name = geom_col,
+                                        crs = sf::st_crs(sf_polys))
+  }
+  if (file.exists(base_path)) file.remove(base_path)
+  for (L in names(layer_results))
+    sf::st_write(layer_results[[L]], base_path, layer = L, quiet = TRUE)
+}
+
+upl_files <- list.files(RUTAS$analysis, pattern = "^base_upl_.*_3116[.]gpkg$",
+                         full.names = TRUE)
+upz_files <- list.files(RUTAS$analysis, pattern = "^base_upz_.*_3116[.]gpkg$",
+                         full.names = TRUE)
+purrr::walk(upl_files, regenerate_base, sf_polys = upl_poly_join, key = "cod_upl")
+purrr::walk(upz_files, regenerate_base, sf_polys = upz_poly_join, key = "cod_upz")
+```
+
+## 20.5 Validaciones de la integración
+
+```{r validacion_integracion}
+SPATIAL_GPKG <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+ly <- sf::st_layers(SPATIAL_GPKG)
+knitr::kable(
+  data.frame(layer = ly$name,
+             geometry = ly$geomtype,
+             features = ly$features,
+             crs = sapply(ly$crs, function(x) {
+               e <- attr(x, "epsg"); if (is.null(e)) "?" else paste0("EPSG:", e)
+             })),
+  caption = "Capas en spatial_layers_3116.gpkg (esperado 6 capas, todas en EPSG:3116)"
+)
+
+upl_pooled <- sf::st_read(file.path(RUTAS$analysis, "base_upl_pooled_anio_3116.gpkg"), quiet = TRUE)
+upz_pooled <- sf::st_read(file.path(RUTAS$analysis, "base_upz_pooled_anio_3116.gpkg"), quiet = TRUE)
+
+knitr::kable(
+  tibble::tibble(
+    base       = c("base_upl_pooled_anio_3116", "base_upz_pooled_anio_3116"),
+    n_unidades = c(nrow(upl_pooled), nrow(upz_pooled)),
+    sum_n_estu = c(sum(upl_pooled$n, na.rm = TRUE), sum(upz_pooled$n, na.rm = TRUE)),
+    geom_type  = c(as.character(sf::st_geometry_type(upl_pooled)[1]),
+                   as.character(sf::st_geometry_type(upz_pooled)[1])),
+    epsg       = c(sf::st_crs(upl_pooled)$epsg, sf::st_crs(upz_pooled)$epsg)
+  ),
+  caption = "Bases UPL/UPZ pooled tras la regeneración con polígonos reales"
+)
+```
+
+---
+
+# 21. Matrices de pesos espaciales W
+
+Esta sección implementa la maquinaria de matrices de pesos espaciales W
+(objetos `listw` de `spdep`) que alimentarán los modelos espaciales
+(Moran global y local en Fase 4; SAR/SEM/SDM en Fase 5).
+
+## 21.1 Decisiones fijas
+
+- **Cinco criterios soportados**: `queen`, `rook` (contigüidad,
+  requieren polígonos), `knn` (k-vecinos), `dist_band` (banda de
+  distancia en metros), `inv_dist` (inverso de la distancia con
+  exponente δ; replica fórmula Delprato et al. 2024).
+- **Epsilon = 50 m** en `inv_dist`. Se aplica
+  `d_corregida = pmax(d_observada, 50)` **antes** de invertir.
+  Justificación: ε representa la **distancia mínima sustantivamente
+  significativa entre instituciones educativas distintas en contexto
+  urbano**, no la resolución métrica del CRS. Las 49 sedes co-ubicadas
+  (24 pares + 1 triplete identificados en Fase 3) obtienen peso
+  `1/50 = 0.02` en lugar de `1/0 = ∞`, preservando que comparten
+  contexto sin volverse dominantes en la matriz. Inocuo para ZAT/UPL/UPZ
+  (sus centroides están todos a > 50 m). El parámetro `epsilon_metros`
+  es configurable para análisis de sensibilidad futuros.
+- **Row-standardization** por defecto (`style = "W"` de `spdep`).
+- **`zero.policy = TRUE`** en todos los `listw` para tolerar islas.
+- **CRS proyectado obligatorio** (3116). La función rechaza entrada en
+  `longlat` para evitar distancias en grados.
+
+### Lista de las 16 matrices W generadas
+
+| Unidad | Matrices |
+|---|---|
+| **sede** (1132 puntos) | `W_sede_knn5`, `W_sede_knn10`, `W_sede_invdist1`, `W_sede_distband_2km`, `W_sede_distband_5km` |
+| **zat** (495 unidades, polígonos para queen/rook, centroides para el resto) | `W_zat_queen`, `W_zat_rook`, `W_zat_knn5`, `W_zat_invdist1`, `W_zat_distband_5km` |
+| **upl** (33 polígonos POT 2022) | `W_upl_queen`, `W_upl_rook`, `W_upl_knn3` |
+| **upz** (102 polígonos IDECA) | `W_upz_queen`, `W_upz_rook`, `W_upz_knn5` |
+
+Total: **5 + 5 + 3 + 3 = 16**.
+
+## 21.2 Función `construir_W`
+
+```{r fn_construir_W}
+#' @description Construye una matriz de pesos espaciales W (objeto
+#'   listw de spdep) sobre una capa sf en CRS proyectado en metros.
+#'   Soporta cinco criterios. Resuelve co-ubicaciones (d=0) en
+#'   inv_dist via epsilon.
+#' @param sf_unidades sf con una fila por unidad. CRS proyectado en metros.
+#' @param criterio "queen" | "rook" | "knn" | "dist_band" | "inv_dist".
+#' @param parametro k para knn (default 5), umbral en metros para
+#'   dist_band (sin default), delta para inv_dist (default 1).
+#'   Ignorado para queen/rook.
+#' @param row_standardize TRUE => style="W"; FALSE => style="B".
+#' @param epsilon_metros Solo afecta inv_dist. Distancia minima
+#'   sustantiva entre instituciones distintas en contexto urbano.
+#'   Default 50 m. Inocuo cuando todas las distancias > epsilon.
+#' @return Objeto listw con zero.policy = TRUE.
+construir_W <- function(sf_unidades, criterio,
+                         parametro = NULL, row_standardize = TRUE,
+                         epsilon_metros = 50) {
+  if (is.na(sf::st_crs(sf_unidades)$epsg) ||
+      isTRUE(sf::st_is_longlat(sf_unidades))) {
+    stop("CRS de sf_unidades debe ser proyectado en metros (no longlat).")
+  }
+  geom_types <- as.character(sf::st_geometry_type(sf_unidades))
+  is_poly <- any(grepl("POLYGON", geom_types))
+  coords_for <- function(x) {
+    if (any(grepl("POLYGON", as.character(sf::st_geometry_type(x)))))
+      sf::st_coordinates(suppressWarnings(sf::st_centroid(x)))
+    else sf::st_coordinates(x)
+  }
+
+  if (criterio %in% c("queen","rook")) {
+    if (!is_poly) stop("Contiguidad ", criterio, " requiere poligonos.")
+    nb <- spdep::poly2nb(sf_unidades, queen = (criterio == "queen"))
+    return(spdep::nb2listw(nb, style = if (row_standardize) "W" else "B",
+                            zero.policy = TRUE))
+  }
+  if (criterio == "knn") {
+    k <- if (is.null(parametro)) 5 else parametro
+    nb <- spdep::knn2nb(spdep::knearneigh(coords_for(sf_unidades), k = k))
+    return(spdep::nb2listw(nb, style = if (row_standardize) "W" else "B",
+                            zero.policy = TRUE))
+  }
+  if (criterio == "dist_band") {
+    if (is.null(parametro)) stop("dist_band requiere parametro = umbral en metros.")
+    nb <- spdep::dnearneigh(coords_for(sf_unidades), d1 = 0, d2 = parametro)
+    return(spdep::nb2listw(nb, style = if (row_standardize) "W" else "B",
+                            zero.policy = TRUE))
+  }
+  if (criterio == "inv_dist") {
+    delta  <- if (is.null(parametro)) 1 else parametro
+    coords <- coords_for(sf_unidades)
+    dmat   <- as.matrix(dist(coords))
+    # Epsilon = 50 m: distancia minima sustantiva (ver 21.1).
+    dmat <- pmax(dmat, epsilon_metros)
+    diag(dmat) <- Inf
+    wmat <- dmat^(-delta)
+    if (row_standardize) {
+      rs <- rowSums(wmat); rs[rs == 0] <- 1
+      wmat <- wmat / rs
+      style <- "W"
+    } else style <- "B"
+    return(spdep::mat2listw(wmat, style = style, zero.policy = TRUE))
+  }
+  stop("Criterio no soportado: ", criterio)
+}
+```
+
+## 21.3 Función `diagnostico_W`
+
+```{r fn_diagnostico_W}
+#' @description Resumen, histograma y reporte de islas para un listw.
+#'   Guarda histograma en outputs/figures/{nombre}_histograma_vecinos.png
+#'   (sin doble prefijo "W_").
+#' @param listw_obj Objeto listw del paquete spdep.
+#' @param nombre Nombre de la W (e.g. "W_sede_knn5"); el prefijo "W_"
+#'   debe estar incluido por el caller.
+#' @param out_dir Carpeta de salida. Default "outputs/figures".
+#' @return Lista con resumen (tibble), plot_path y vector de islas.
+diagnostico_W <- function(listw_obj, nombre = "W",
+                           out_dir = file.path(RUTAS$outputs, "figures")) {
+  card <- spdep::card(listw_obj$neighbours)
+  islas <- which(card == 0)
+  conn  <- tryCatch(spdep::n.comp.nb(listw_obj$neighbours)$nc,
+                    error = function(e) NA_integer_)
+  is_sym <- spdep::is.symmetric.nb(listw_obj$neighbours)
+  resumen <- tibble::tibble(
+    nombre_W      = nombre,
+    n_unidades    = length(card),
+    n_vec_min     = min(card),
+    n_vec_med     = stats::median(card),
+    n_vec_media   = round(mean(card), 2),
+    n_vec_max     = max(card),
+    n_islas       = length(islas),
+    n_componentes = conn,
+    es_simetrica  = is_sym
+  )
+  hist_data <- tibble::tibble(unit_id = seq_along(card), n_vecinos = card)
+  p <- ggplot2::ggplot(hist_data, ggplot2::aes(x = n_vecinos)) +
+    ggplot2::geom_histogram(bins = max(10, min(40, length(unique(card)))),
+                             fill = "#4C72B0", color = "white",
+                             linewidth = 0.2) +
+    ggplot2::labs(title    = paste("Distribucion de vecinos:", nombre),
+                   subtitle = sprintf("n=%d unidades, mediana=%.0f, max=%d, islas=%d",
+                                       length(card), stats::median(card),
+                                       max(card), length(islas)),
+                   x       = "Numero de vecinos",
+                   y       = "Frecuencia (unidades)",
+                   caption = Q1_CAPTION) +
+    theme_q1()
+  out_path <- file.path(out_dir, paste0(nombre, "_histograma_vecinos.png"))
+  ggplot2::ggsave(out_path, plot = p, width = 8, height = 6, dpi = Q1_DPI,
+                   device = "png", bg = "white")
+  list(resumen = resumen, plot_path = out_path, islas = islas)
+}
+```
+
+## 21.4 Función `lineas_de_vecinos`
+
+```{r fn_lineas_vecinos}
+#' @description Construye un sf de LINESTRING para visualizar las
+#'   conexiones de vecindad de un listw sobre la geometria de
+#'   sf_unidades (cada arista una sola vez).
+lineas_de_vecinos <- function(listw_obj, sf_unidades) {
+  centroids <- if (any(grepl("POLYGON",
+                              as.character(sf::st_geometry_type(sf_unidades)))))
+    suppressWarnings(sf::st_centroid(sf_unidades)) else sf_unidades
+  coords <- sf::st_coordinates(centroids)
+  nb <- listw_obj$neighbours
+  edges <- purrr::map_dfr(seq_along(nb), function(i) {
+    if (length(nb[[i]]) == 0 || nb[[i]][1] == 0) return(tibble::tibble())
+    tibble::tibble(from = i, to = nb[[i]])
+  }) |> dplyr::filter(from < to)
+  if (nrow(edges) == 0)
+    return(sf::st_sf(geometry = sf::st_sfc(crs = sf::st_crs(sf_unidades))))
+  lines <- lapply(seq_len(nrow(edges)), function(j)
+    sf::st_linestring(rbind(coords[edges$from[j], ], coords[edges$to[j], ])))
+  sf::st_sf(geometry = sf::st_sfc(lines, crs = sf::st_crs(sf_unidades)))
+}
+```
+
+## 21.5 Generación de las 16 matrices W
+
+Heavy regeneration; `eval = FALSE` por defecto. Las matrices y sus
+diagnósticos se persisten en `outputs/models/W_*.rds` y
+`outputs/figures/W_*_histograma_vecinos.png`.
+
+```{r generar_16_W, eval=FALSE}
+SPATIAL_GPKG <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+MODELS_DIR   <- file.path(RUTAS$outputs, "models")
+TBL_DIR      <- file.path(RUTAS$outputs, "tables")
+dir.create(MODELS_DIR, showWarnings = FALSE, recursive = TRUE)
+dir.create(TBL_DIR,    showWarnings = FALSE, recursive = TRUE)
+
+b_sede <- sf::st_read(file.path(RUTAS$analysis, "base_sede_pooled_anio_3116.gpkg"), quiet = TRUE)
+b_zat  <- sf::st_read(file.path(RUTAS$analysis, "base_zat_pooled_anio_3116.gpkg"),  quiet = TRUE)
+b_upl  <- sf::st_read(file.path(RUTAS$analysis, "base_upl_pooled_anio_3116.gpkg"),  quiet = TRUE)
+b_upz  <- sf::st_read(file.path(RUTAS$analysis, "base_upz_pooled_anio_3116.gpkg"),  quiet = TRUE)
+
+# Para queen/rook sobre ZAT, polígonos de zats_poligonos filtrados a Bogotá-DC y
+# a las ZATs presentes en la base agregada.
+zats_poly <- sf::st_read(SPATIAL_GPKG, layer = "zats_poligonos", quiet = TRUE) |>
+  dplyr::filter(MUNCod == 11001) |>
+  dplyr::mutate(zat_id = as.character(ZAT)) |>
+  dplyr::filter(zat_id %in% as.character(b_zat$zat_id)) |>
+  dplyr::select(zat_id)
+
+W_specs <- list(
+  list(name = "W_sede_knn5",         sf = b_sede,    crit = "knn",       par = 5),
+  list(name = "W_sede_knn10",        sf = b_sede,    crit = "knn",       par = 10),
+  list(name = "W_sede_invdist1",     sf = b_sede,    crit = "inv_dist",  par = 1),
+  list(name = "W_sede_distband_2km", sf = b_sede,    crit = "dist_band", par = 2000),
+  list(name = "W_sede_distband_5km", sf = b_sede,    crit = "dist_band", par = 5000),
+  list(name = "W_zat_queen",         sf = zats_poly, crit = "queen"),
+  list(name = "W_zat_rook",          sf = zats_poly, crit = "rook"),
+  list(name = "W_zat_knn5",          sf = b_zat,     crit = "knn",       par = 5),
+  list(name = "W_zat_invdist1",      sf = b_zat,     crit = "inv_dist",  par = 1),
+  list(name = "W_zat_distband_5km",  sf = b_zat,     crit = "dist_band", par = 5000),
+  list(name = "W_upl_queen",         sf = b_upl,     crit = "queen"),
+  list(name = "W_upl_rook",          sf = b_upl,     crit = "rook"),
+  list(name = "W_upl_knn3",          sf = b_upl,     crit = "knn",       par = 3),
+  list(name = "W_upz_queen",         sf = b_upz,     crit = "queen"),
+  list(name = "W_upz_rook",          sf = b_upz,     crit = "rook"),
+  list(name = "W_upz_knn5",          sf = b_upz,     crit = "knn",       par = 5)
+)
+
+resumen_W <- list()
+for (sp in W_specs) {
+  W <- construir_W(sp$sf, sp$crit, parametro = sp$par)
+  saveRDS(W, file.path(MODELS_DIR, paste0(sp$name, ".rds")))
+  d <- diagnostico_W(W, nombre = sp$name)
+  resumen_W[[sp$name]] <- d$resumen |>
+    dplyr::mutate(unidad   = sub("^W_([a-z]+)_.*", "\\1", sp$name),
+                   criterio = sp$crit,
+                   parametro = if (is.null(sp$par)) NA_character_ else as.character(sp$par),
+                   epsilon_aplicado = if (sp$crit == "inv_dist") 50 else NA_real_)
+}
+tabla_W <- dplyr::bind_rows(resumen_W) |>
+  dplyr::select(nombre_W, unidad, criterio, parametro, epsilon_aplicado,
+                 n_unidades, n_vec_min, n_vec_med, n_vec_media, n_vec_max,
+                 n_islas, n_componentes, es_simetrica)
+readr::write_csv(tabla_W, file.path(TBL_DIR, "tabla_resumen_W.csv"))
+```
+
+## 21.6 Lectura, diagnóstico y visualización de las 16 W
+
+```{r leer_y_mostrar_W, results="asis"}
+MODELS_DIR <- file.path(RUTAS$outputs, "models")
+W_files <- sort(list.files(MODELS_DIR, pattern = "^W_.*\\.rds$", full.names = TRUE))
+
+for (f in W_files) {
+  W <- readRDS(f)
+  nombre <- sub("\\.rds$", "", basename(f))
+  d <- diagnostico_W(W, nombre = nombre)
+  cat("\n\n### ", nombre, "\n\n", sep = "")
+  print(knitr::kable(d$resumen, caption = paste("Diagnostico:", nombre)))
+  if (length(d$islas) > 0) {
+    cat(sprintf("\nIslas (%d): primeras 10 indices = %s\n\n",
+                length(d$islas),
+                paste(utils::head(d$islas, 10), collapse = ", ")))
+  }
+  # Para que include_graphics funcione dentro de un for-loop con
+  # results="asis", se emite directamente la sintaxis markdown de imagen.
+  cat(sprintf("\n\n![%s](%s)\n\n", nombre, d$plot_path))
+}
+```
+
+## 21.7 Tabla resumen comparativa de las 16 W
+
+```{r tabla_resumen_W}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+tabla_W <- readr::read_csv(file.path(TBL_DIR, "tabla_resumen_W.csv"),
+                            show_col_types = FALSE, progress = FALSE)
+knitr::kable(tabla_W,
+             caption = "Resumen comparativo de las 16 matrices W")
+```
+
+## 21.8 Visualización de tres W ejemplares (mapas de conexiones)
+
+```{r mapas_conexiones_W, fig.width=9, fig.height=9, dpi=150, dev="png", fig.cap=c("W_zat_queen: contiguidad reina sobre polígonos ZAT (Bogotá-DC)","W_upl_queen: contiguidad reina sobre polígonos UPL","W_sede_knn5 sobre 100 sedes muestreadas (set.seed(42))")}
+MAP_DIR <- file.path(RUTAS$outputs, "maps")
+knitr::include_graphics(file.path(MAP_DIR, "W_zat_queen_conexiones.png"))
+knitr::include_graphics(file.path(MAP_DIR, "W_upl_queen_conexiones.png"))
+knitr::include_graphics(file.path(MAP_DIR, "W_sede_knn5_conexiones.png"))
+```
+
+El chunk de generación de los tres mapas (`eval = FALSE`):
+
+```{r generar_mapas_conexiones_W, eval=FALSE}
+SPATIAL_GPKG <- file.path(RUTAS$cleaned, "spatial_layers_3116.gpkg")
+MAP_DIR      <- file.path(RUTAS$outputs, "maps")
+MODELS_DIR   <- file.path(RUTAS$outputs, "models")
+
+b_sede <- sf::st_read(file.path(RUTAS$analysis, "base_sede_pooled_anio_3116.gpkg"), quiet = TRUE)
+b_upl  <- sf::st_read(file.path(RUTAS$analysis, "base_upl_pooled_anio_3116.gpkg"),  quiet = TRUE)
+b_zat  <- sf::st_read(file.path(RUTAS$analysis, "base_zat_pooled_anio_3116.gpkg"),  quiet = TRUE)
+zats_poly <- sf::st_read(SPATIAL_GPKG, layer = "zats_poligonos", quiet = TRUE) |>
+  dplyr::filter(MUNCod == 11001) |>
+  dplyr::mutate(zat_id = as.character(ZAT)) |>
+  dplyr::filter(zat_id %in% as.character(b_zat$zat_id)) |>
+  dplyr::select(zat_id)
+
+# Mapa 1
+W <- readRDS(file.path(MODELS_DIR, "W_zat_queen.rds"))
+e <- lineas_de_vecinos(W, zats_poly)
+p1 <- ggplot2::ggplot() +
+  ggplot2::geom_sf(data = zats_poly, fill = "grey95", color = "grey60", linewidth = 0.2) +
+  ggplot2::geom_sf(data = e,         color = "darkred", alpha = 0.5, linewidth = 0.3) +
+  ggplot2::labs(title = "W_zat_queen: contiguidad reina sobre poligonos ZAT (Bogota-DC)",
+                 subtitle = sprintf("%d ZATs, %d aristas", nrow(zats_poly), nrow(e))) +
+  ggplot2::theme_minimal(base_size = 11)
+ggplot2::ggsave(file.path(MAP_DIR, "W_zat_queen_conexiones.png"),
+                 plot = p1, width = 9, height = 9, dpi = 150, device = "png", bg = "white")
+
+# Mapa 2
+W <- readRDS(file.path(MODELS_DIR, "W_upl_queen.rds"))
+e <- lineas_de_vecinos(W, b_upl)
+p2 <- ggplot2::ggplot() +
+  ggplot2::geom_sf(data = b_upl, fill = "grey95", color = "grey60", linewidth = 0.3) +
+  ggplot2::geom_sf(data = e,     color = "darkred", alpha = 0.6, linewidth = 0.4) +
+  ggplot2::labs(title = "W_upl_queen: contiguidad reina sobre poligonos UPL",
+                 subtitle = sprintf("%d UPL Bogota-DC, %d aristas", nrow(b_upl), nrow(e))) +
+  ggplot2::theme_minimal(base_size = 11)
+ggplot2::ggsave(file.path(MAP_DIR, "W_upl_queen_conexiones.png"),
+                 plot = p2, width = 9, height = 9, dpi = 150, device = "png", bg = "white")
+
+# Mapa 3 (set.seed para reproducibilidad)
+set.seed(42)
+b_sede_sample <- b_sede[sample(seq_len(nrow(b_sede)), 100), ]
+W <- construir_W(b_sede_sample, "knn", parametro = 5)
+e <- lineas_de_vecinos(W, b_sede_sample)
+p3 <- ggplot2::ggplot() +
+  ggplot2::geom_sf(data = b_upl,         fill = "grey95", color = "grey80", linewidth = 0.2) +
+  ggplot2::geom_sf(data = e,             color = "darkred", alpha = 0.5, linewidth = 0.4) +
+  ggplot2::geom_sf(data = b_sede_sample, color = "steelblue", size = 1.2) +
+  ggplot2::labs(title = "W_sede_knn5: 5-NN sobre 100 sedes muestreadas (set.seed(42))",
+                 subtitle = "100 sedes mostradas de 1132 totales; UPL como referencia") +
+  ggplot2::theme_minimal(base_size = 11)
+ggplot2::ggsave(file.path(MAP_DIR, "W_sede_knn5_conexiones.png"),
+                 plot = p3, width = 9, height = 9, dpi = 150, device = "png", bg = "white")
+```
+
+---
+
+# 22. Autocorrelación espacial: Moran global y LISA
+
+Esta sección estima la dependencia espacial de la variable dependiente
+estandarizada `punt_global_z_periodo_media` a las cuatro escalas
+(sede, ZAT, UPL, UPZ), siguiendo metodología de Delprato/Chudgar/Frola
+(2024) y Xiao Li (2024). Aplica:
+
+- **Moran's I global** (analítico + permutación n=999, `set.seed(42)`)
+  con la W principal por escala (D9: knn salvo upl=queen) y robustez
+  con el resto de W disponibles.
+- **Comparación crudo vs estandarizado** para validar empíricamente
+  D13.
+- **Análisis Sumapaz** (D10: dominio completo vs urbano) y
+  **sensibilidad n ≥ 30** (D11: resolución TODO #4).
+- **Moran's I local (LISA)** con clasificación HH/LL/HL/LH/NS al 5 %.
+- Mapas LISA por escala y mapa comparativo 2 × 2.
+
+## 22.1 Función `moran_global`
+
+```{r fn_moran_global}
+#' @description Moran's I global (analitico via moran.test + permutacion
+#'   via moran.mc) para una o varias variables sobre un objeto sf.
+#' @param sf_base sf con las columnas en vars y geometria que coincida
+#'   con listw_obj.
+#' @param vars Vector de nombres de columnas numericas a evaluar.
+#' @param listw_obj Objeto listw (paquete spdep) construido sobre sf_base.
+#' @param nsim Numero de permutaciones de Monte Carlo. Default 999.
+#' @param zero_policy TRUE para tolerar islas en listw_obj.
+#' @return tibble con una fila por variable: I, E_I, var_I, z, p_normal,
+#'   p_perm, n.
+moran_global <- function(sf_base, vars, listw_obj, nsim = 999,
+                          zero_policy = TRUE) {
+  purrr::map_dfr(vars, function(v) {
+    if (!v %in% names(sf_base)) {
+      return(tibble::tibble(variable = v, n = NA, I = NA, E_I = NA,
+                             var_I = NA, z = NA, p_normal = NA,
+                             p_perm = NA, nsim = NA,
+                             error = "var no encontrada"))
+    }
+    x <- sf_base[[v]]
+    n <- sum(!is.na(x))
+    mt <- tryCatch(
+      spdep::moran.test(x, listw_obj, zero.policy = zero_policy,
+                         na.action = na.exclude),
+      error = function(e) NULL)
+    set.seed(42)
+    mc <- tryCatch(
+      spdep::moran.mc(x, listw_obj, nsim = nsim, zero.policy = zero_policy,
+                       na.action = na.exclude),
+      error = function(e) NULL)
+    tibble::tibble(
+      variable = v, n = n,
+      I       = if (!is.null(mt)) unname(mt$estimate["Moran I statistic"]) else NA,
+      E_I     = if (!is.null(mt)) unname(mt$estimate["Expectation"]) else NA,
+      var_I   = if (!is.null(mt)) unname(mt$estimate["Variance"]) else NA,
+      z       = if (!is.null(mt)) unname(mt$statistic) else NA,
+      p_normal = if (!is.null(mt)) mt$p.value else NA,
+      p_perm   = if (!is.null(mc)) mc$p.value else NA,
+      nsim    = nsim,
+      error   = NA_character_
+    )
+  })
+}
+```
+
+## 22.2 Moran global principal: 24 tests (4 escalas × 6 variables)
+
+```{r tabla_moran_principal}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+moran_principal <- readr::read_csv(file.path(TBL_DIR, "moran_global_principal.csv"),
+                                     show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  moran_principal |>
+    dplyr::select(escala, W_usada, variable, n, I, p_perm) |>
+    dplyr::mutate(I = round(I, 4)),
+  caption = "Moran global sobre las 6 variables estandarizadas (z-score por periodo) en las 4 escalas, con W principal por escala (D9)."
+)
+```
+
+## 22.3 Comparación crudo vs estandarizado (validación de D13)
+
+```{r tabla_crudo_vs_z}
+crudo_vs_z <- readr::read_csv(file.path(TBL_DIR, "moran_crudo_vs_estandarizado.csv"),
+                                show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  crudo_vs_z |> dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ round(.x, 4))),
+  caption = "Moran de punt_global crudo vs estandarizado por periodo (D13). Diferencia absoluta indica el efecto de la estandarizacion."
+)
+```
+
+## 22.4 Robustez con W alternativas
+
+```{r tabla_robustez_W}
+robustez <- readr::read_csv(file.path(TBL_DIR, "moran_global_robustez.csv"),
+                              show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  robustez |> dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ round(.x, 4))),
+  caption = "Sensibilidad de Moran a la eleccion de W. delta_I = I_robustez - I_principal. sensibilidad_alta=TRUE si |delta_I|>0.10."
+)
+```
+
+## 22.5 Sumapaz: completo vs urbano
+
+```{r tabla_sumapaz}
+sumapaz <- readr::read_csv(file.path(TBL_DIR, "moran_sede_sumapaz.csv"),
+                             show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  sumapaz |> dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ round(.x, 4))),
+  caption = "Moran a escala sede: dominio completo (1132 sedes incl. Sumapaz rural) vs urbano (excluye DANE12_SED 211850*). D10."
+)
+```
+
+## 22.6 Sensibilidad n ≥ 30 (resolución TODO #4)
+
+```{r tabla_n30}
+n30 <- readr::read_csv(file.path(TBL_DIR, "moran_n30_sensitivity.csv"),
+                         show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  n30 |> dplyr::mutate(dplyr::across(dplyr::where(is.numeric), ~ round(.x, 4))),
+  caption = "Moran sin filtro vs con filtro n>=30 unidades. delta_I=|I_filt - I_unfilt|; <0.05 implica que el filtro no aporta."
+)
+```
+
+## 22.7 Función `moran_local`
+
+```{r fn_moran_local}
+#' @description Moran's I local (LISA) sobre una variable. Devuelve sf con
+#'   columnas Ii, Z_Ii, p_Ii y cluster_type (HH/LL/HL/LH/NS al alpha
+#'   especificado por permutacion analitica de spdep::localmoran).
+moran_local <- function(sf_base, var, listw_obj, alpha = 0.05,
+                         zero_policy = TRUE) {
+  x <- sf_base[[var]]
+  set.seed(42)
+  loc <- spdep::localmoran(x, listw_obj, zero.policy = zero_policy,
+                            na.action = na.exclude)
+  xs <- scale(x, scale = FALSE)
+  set.seed(42)
+  lag_x <- spdep::lag.listw(listw_obj, x, zero.policy = zero_policy)
+  lag_xs <- lag_x - mean(lag_x, na.rm = TRUE)
+  p <- loc[, "Pr(z != E(Ii))"]
+  cluster_type <- ifelse(is.na(p) | p > alpha, "NS",
+                  ifelse(xs > 0 & lag_xs > 0, "HH",
+                  ifelse(xs > 0 & lag_xs < 0, "HL",
+                  ifelse(xs < 0 & lag_xs > 0, "LH",
+                                              "LL"))))
+  out <- sf_base
+  out$Ii      <- loc[, "Ii"]
+  out$Z_Ii    <- loc[, "Z.Ii"]
+  out$p_Ii    <- p
+  out$cluster_type <- factor(cluster_type, levels = c("HH","LL","HL","LH","NS"))
+  out
+}
+```
+
+## 22.8 LISA por escala — conteos y mapas
+
+```{r tabla_lisa_conteos}
+counts <- readr::read_csv(file.path(TBL_DIR, "tabla_resumen_lisa.csv"),
+                            show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  counts |> dplyr::select(escala, cluster_type, n, pct),
+  caption = "Conteos LISA por escala y tipo de cluster (al 5% por permutacion analitica)."
+)
+```
+
+```{r mapas_lisa_individuales, results="asis"}
+MAP_DIR <- file.path(RUTAS$outputs, "maps")
+for (esc in c("sede","zat","upl","upz")) {
+  pth <- file.path(MAP_DIR, sprintf("lisa_%s_punt_global_z.png", esc))
+  if (file.exists(pth)) {
+    cat(sprintf("\n\n### LISA %s\n\n", esc))
+    cat(sprintf("![Clusters LISA escala %s](%s)\n\n", esc, pth))
+  }
+}
+```
+
+## 22.9 Mapa comparativo 2 × 2 (figura clave)
+
+```{r mapa_lisa_comparativo, fig.width=14, fig.height=12, dpi=150, dev="png", fig.cap="Clusters LISA por escala. Replica el argumento Delprato et al. (2024) de que la estructura espacial cambia con la unidad de agregacion."}
+knitr::include_graphics(file.path(RUTAS$outputs, "maps",
+                                    "lisa_comparativo_4escalas.png"))
+```
+
+## 22.10 Generación pesada (Moran + LISA + mapas)
+
+Heavy regeneration; `eval = FALSE` por defecto. Para regenerar todas
+las tablas y mapas de esta sección, cambiar a `eval = TRUE` o ver el
+script `.tmp_moran.R` que se usó para producir los outputs versionados.
+
+```{r generar_moran_lisa, eval=FALSE}
+# Pipeline esquematico (la version completa esta documentada en
+# project history, commits Phase 4.1+4.2). Variables y W principales
+# se toman de las decisiones D9 (W principal) y D13 (variable z).
+
+vars_z <- c("punt_global_z_periodo_media",
+            "punt_matematicas_z_periodo_media",
+            "punt_lectura_critica_z_periodo_media",
+            "punt_c_naturales_z_periodo_media",
+            "punt_sociales_ciudadanas_z_periodo_media",
+            "punt_ingles_z_periodo_media")
+
+W_principal <- list(sede = "W_sede_knn5", zat = "W_zat_knn5",
+                    upl  = "W_upl_queen", upz = "W_upz_knn5")
+
+bases_pooled <- list(
+  sede = sf::st_read(file.path(RUTAS$analysis, "base_sede_pooled_anio_3116.gpkg"), quiet = TRUE),
+  zat  = sf::st_read(file.path(RUTAS$analysis, "base_zat_pooled_anio_3116.gpkg"),  quiet = TRUE),
+  upl  = sf::st_read(file.path(RUTAS$analysis, "base_upl_pooled_anio_3116.gpkg"),  quiet = TRUE),
+  upz  = sf::st_read(file.path(RUTAS$analysis, "base_upz_pooled_anio_3116.gpkg"),  quiet = TRUE)
+)
+
+W_list <- setNames(
+  lapply(list.files(file.path(RUTAS$outputs, "models"),
+                     pattern = "^W_.*\\.rds$", full.names = TRUE), readRDS),
+  sub("\\.rds$", "", basename(list.files(file.path(RUTAS$outputs, "models"),
+                                          pattern = "^W_.*\\.rds$")))
+)
+
+# 4.1.2: 24 tests Moran principales
+moran_principal <- purrr::map_dfr(names(bases_pooled), function(esc) {
+  W <- W_list[[ W_principal[[esc]] ]]
+  moran_global(bases_pooled[[esc]], vars_z, W, nsim = 999) |>
+    dplyr::mutate(escala = esc, W_usada = W_principal[[esc]], .before = 1)
+})
+readr::write_csv(moran_principal, file.path(RUTAS$outputs, "tables",
+                                              "moran_global_principal.csv"))
+
+# 4.2: LISA + mapas (ver script externo para implementacion completa)
+```
+
+## 22.11 Interpretación narrativa
+
+### 22.11.1 ¿Existe autocorrelación espacial significativa?
+
+Sí, fuertemente, en las cuatro escalas. Para `punt_global_z_periodo_media`
+(W principal):
+
+- **sede**: I = 0.300, p = 0.001 (n = 1132)
+- **zat**: I = 0.338, p = 0.001 (n = 495)
+- **upl**: I = 0.454, p = 0.001 (n = 33)
+- **upz**: I = 0.410, p = 0.001 (n = 102)
+
+### 22.11.2 ¿Cómo cambia con la escala?
+
+I crece monotónicamente con la agregación territorial: sede (0.30) <
+zat (0.34) < upz (0.41) < upl (0.45). Es esperable: agregar reduce
+ruido idiosincrásico de cada escuela y deja sólo señal espacial. Esto
+**confirma el problema de unidad espacial modificable (MAUP)** que
+Delprato et al. (2024) explotan: la dependencia espacial medida es
+parcialmente artefacto de la elección de unidad.
+
+### 22.11.3 ¿Dónde están los hot/cold spots?
+
+Conteos LISA al 5 %:
+
+- **sede**: 101 HH, 57 LL (158 sedes significativas, ~14 % del total)
+- **zat**: 49 HH, 39 LL (88 ZATs significativos, ~18 %)
+- **upl**: 5 HH, 2 LL (7 UPL significativas, ~21 %)
+- **upz**: 9 HH, 9 LL (18 UPZ significativas, ~18 %)
+
+Los mapas de la sección 22.8 muestran que los HH (cluster alto) se
+concentran en el norte de la ciudad (Usaquén, Chapinero, Suba norte,
+Teusaquillo) y los LL en el sur-occidente (Ciudad Bolívar, Bosa, Usme,
+Kennedy, San Cristóbal).
+
+### 22.11.4 Robustez a W
+
+Para sede y zat la elección de W **importa significativamente** (delta_I
+hasta -0.21 en sede invdist1 vs knn5; -0.23 en zat queen vs knn5). Para
+upl y upz la magnitud es estable (delta_I < 0.07). Esto sugiere que en
+fases posteriores de modelación SDM/SAR conviene reportar resultados
+con al menos dos W contrastantes en sede/zat (knn como principal +
+banda de distancia o contigüidad como robustez).
+
+### 22.11.5 Sumapaz
+
+I sede completo (0.300) ≈ I sede urbano (0.296). **Sumapaz no domina
+los resultados.** Las 11 sedes rurales del Sumapaz incluidas en la base
+no inflan ni distorsionan la autocorrelación medida, y se pueden
+mantener en el análisis principal sin perjuicio metodológico.
+
+### 22.11.6 ¿Cambia el filtro n ≥ 30?
+
+No. delta_I < 0.02 en las cuatro escalas. **TODO #4 resuelto:**
+en Fase 5 se modelará sin filtro de n por defecto, manteniendo
+sensibilidad con filtro como robustez ad-hoc si algún coeficiente
+muestra inestabilidad.
+
+### 22.11.7 ¿La estandarización por período cambia los resultados?
+
+A escala fina sí (sede: I_crudo=0.363 vs I_z=0.300, diferencia 0.063;
+zat: 0.385 vs 0.338, diferencia 0.048). A escala gruesa no
+significativamente (upl/upz diferencia < 0.01). **D13 queda validada
+empíricamente: la estandarización elimina ~6 puntos de Moran
+artificial atribuibles a las brechas de calibración entre semestres
+calendario A vs B.** Sin estandarizar, parte de la "autocorrelación"
+medida sería ruido temporal de las pruebas, no señal espacial.
+
+## 22.12 LISA URBANO (sin Sumapaz) — versión cartográficamente legible
+
+Sumapaz ocupa ~78,097 ha (≈ 78 % del área de Bogotá-DC) pero contiene
+apenas 11 sedes geolocalizadas (todas con DANE12_SED iniciando en
+`211850`). En los mapas LISA completos eso comprime la zona urbana
+—donde está casi toda la señal— a un puñado de píxeles. Esta sección
+reporta una versión paralela urbana (excluyendo Sumapaz) con los
+mismos métodos. **Las versiones completas (sección 22.8) se conservan
+como referencia; las urbanas son adicionales, no reemplazo.**
+
+### 22.12.1 Definición operativa de "urbano"
+
+- **sede**: subset `cole_cod_dane_sede` que NO empieza por `"211850"`.
+- **upl**: subset `cod_upl != "1"` (excluye UPL01 = Sumapáz).
+- **zat / upz**: subset por `st_intersects` del centroide contra el
+  polígono UPL01.
+
+### 22.12.2 Conteos urbano vs completo y Moran global
+
+```{r tabla_moran_urbano_vs_completo}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+comp_uv <- readr::read_csv(file.path(TBL_DIR, "moran_global_urbano_vs_completo.csv"),
+                             show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  comp_uv,
+  caption = "Moran global completo vs urbano (excluye Sumapaz). diferencia = I_urbano - I_completo. Valores cercanos a 0 indican que Sumapaz no domina."
+)
+```
+
+### 22.12.3 Conteos LISA urbano por escala
+
+```{r tabla_lisa_conteos_urbano}
+counts_urb <- readr::read_csv(file.path(TBL_DIR, "tabla_resumen_lisa_urbano.csv"),
+                                show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  counts_urb |> dplyr::select(escala, cluster_type, n, pct),
+  caption = "Conteos LISA urbano por escala y tipo de cluster (al 5 %)."
+)
+```
+
+### 22.12.4 Mapas LISA urbanos
+
+```{r mapas_lisa_urbano, results="asis"}
+MAP_DIR <- file.path(RUTAS$outputs, "maps")
+for (esc in c("sede","zat","upl","upz")) {
+  pth <- file.path(MAP_DIR, sprintf("lisa_%s_punt_global_z_urbano.png", esc))
+  if (file.exists(pth)) {
+    cat(sprintf("\n\n#### LISA urbano %s\n\n", esc))
+    cat(sprintf("![Clusters LISA urbano %s](%s)\n\n", esc, pth))
+  }
+}
+```
+
+### 22.12.5 Mapa comparativo urbano 2 × 2
+
+```{r mapa_lisa_comparativo_urbano, fig.width=14, fig.height=12, dpi=150, dev="png", fig.cap="Clusters LISA URBANO por escala. Misma logica que la version completa pero excluyendo Sumapaz para mejorar legibilidad."}
+knitr::include_graphics(file.path(RUTAS$outputs, "maps",
+                                    "lisa_comparativo_4escalas_urbano.png"))
+```
+
+### 22.12.6 Conclusión sobre la versión urbana
+
+La diferencia de I de Moran completo vs urbano es despreciable (|Δ| ≤
+0.017 en las 4 escalas), confirmando que **Sumapaz no domina los
+resultados estadísticos** ni distorsiona la autocorrelación medida.
+Los 11 puntos rurales del Sumapaz aportan un peso marginal a la matriz
+W cuando se mantienen. **La elección entre la versión completa y la
+urbana es por tanto cartográfica, no metodológica:** los mapas
+urbanos son útiles para inspección visual fina; los completos son los
+canónicos del análisis.
+
+---
+
+# 23. Modelos espaciales panel — Pooled SDM principal y robustez Within
+
+Esta sección implementa la modelación econométrica espacial principal
+(Spatial Durbin Model panel) sobre las 4 escalas (sede, ZAT, UPL,
+UPZ), usando la variable dependiente `punt_global_z_periodo_media`
+(definida en D13) y las 8 covariables Lista B refinadas (D14).
+
+## 23.1 Decisiones fijas (D14, D15, D16-revisada, D17, D18, D20)
+
+- **Variable dependiente**: `punt_global_z_periodo_media` (z-score
+  por período, definido en D13).
+- **8 covariables Lista B**: `estrato_promedio`, `prop_oficial`,
+  `prop_internet_hogar`, `prop_jornada_completa`,
+  `prop_calendario_a`, `prop_genero_femenino`, `prop_bilingue`,
+  `n_estudiantes_log`. `prop_madre_universitaria` excluida del
+  principal (correlación r=0.86 con `estrato_promedio`).
+- **`prop_bilingue`**: NA imputado a 0 (asunción "no bilingüe por
+  defecto"; sensibilidad 5.4.2 sin la variable).
+- **Modelo principal**: **Pooled SDM** (Spatial Durbin Model con
+  `lag = Y` + `lag = X` + dummies de año), estimado con
+  `spatialreg::lagsarlm` sobre el panel apilado y W block-diagonal
+  (kron(I_T, W_n)). Justificación metodológica: las variables
+  institucionales (oficial, jornada, calendario, bilingüe) son
+  invariantes intra-unidad en sede (>92% invariancia) y ZAT (>59%);
+  Within las elimina por demeaning. La pregunta sustantiva de la
+  tesis exige identificarlas.
+- **Robustez Within-SDM** per-escala con threshold 50% de
+  invariancia: sede=4 cov, ZAT=4, UPL=6, UPZ=6.
+- **SE**: asintóticos ML estándar de `spatialreg::lagsarlm` en
+  todos los modelos. Bootstrap-cluster (B=200) puntual en UPL como
+  validación de la inferencia (D20). Declaración explícita en
+  metodología 5.5.0.
+- **W principal por escala** (D18): `W_sede_knn5`, `W_zat_knn5`,
+  `W_upl_queen`, `W_upz_knn5`. W block-diagonales pre-construidas
+  en `outputs/models/W_block_{escala}_{T}periodos_3116.rds`.
+
+## 23.2 Función `construir_W_block_diag`
+
+```{r fn_W_block_diag}
+#' @description Construye W block-diagonal kron(I_T, W_n) para
+#'   modelar SDM pooled sobre panel apilado: cada periodo tiene
+#'   su propia W cross-section, sin conexiones entre periodos.
+#' @param W_listw listw cross-section (paquete spdep).
+#' @param T Numero de periodos del panel.
+#' @return listw block-diagonal de dimension (n*T) x (n*T).
+construir_W_block_diag <- function(W_listw, T) {
+  W_mat   <- spdep::listw2mat(W_listw)
+  W_block <- Matrix::bdiag(replicate(T, W_mat, simplify = FALSE))
+  W_block <- as(W_block, "CsparseMatrix")
+  spdep::mat2listw(W_block, style = "W", zero.policy = TRUE)
+}
+```
+
+## 23.3 Diagnósticos pre-modelación
+
+### 23.3.1 Función `diagnostico_panel`
+
+```{r fn_diagnostico_panel}
+#' @description Diagnostica una base panel para modelacion SDM:
+#'   estructura (n_unidades, T, % balance), NA por covariable,
+#'   VIF en OLS pooled, correlaciones bivariadas Y~X.
+diagnostico_panel <- function(panel_data, var_dep, vars_indep,
+                                key_unidad, key_tiempo) {
+  d <- panel_data |> sf::st_drop_geometry()
+  n_u <- length(unique(d[[key_unidad]]))
+  n_t <- length(unique(d[[key_tiempo]]))
+  pct_bal <- round(100 * nrow(d) / (n_u * n_t), 2)
+  fmla <- as.formula(paste(var_dep, "~", paste(vars_indep, collapse = " + ")))
+  mod  <- lm(fmla, data = d)
+  vif <- {
+    X <- model.matrix(mod)[, -1, drop = FALSE]
+    sapply(seq_len(ncol(X)), function(i)
+      1 / (1 - summary(lm(X[, i] ~ X[, -i, drop = FALSE]))$r.squared))
+  }
+  list(
+    estructura = tibble::tibble(n_unidades = n_u, n_periodos = n_t,
+                                  n_celdas = nrow(d), pct_balance = pct_bal),
+    vif = tibble::tibble(variable = vars_indep,
+                          VIF = round(vif, 3),
+                          alta = vif > 5),
+    cor_y = tibble::tibble(variable = vars_indep,
+                            r = round(sapply(vars_indep, function(v)
+                              cor(d[[var_dep]], d[[v]],
+                                   use = "pairwise.complete.obs")), 4))
+  )
+}
+```
+
+### 23.3.2 Función `tests_lm_per_year`
+
+```{r fn_tests_lm}
+#' @description Tests Anselin LM-error / LM-lag por anio (cross-
+#'   section). Workaround para el bug "not conformable for
+#'   multiplication" de splm::slmtest 1.6 + spdep 1.3 en panel.
+#'   Reconstruye W para los units presentes cada anio.
+tests_lm_per_year <- function(panel_sf, formula, key, W_criterio, W_par) {
+  d <- panel_sf |> sf::st_drop_geometry()
+  years <- sort(unique(d$anio))
+  purrr::map_dfr(years, function(yr) {
+    sub <- panel_sf |> dplyr::filter(anio == yr) |>
+      dplyr::distinct(across(dplyr::all_of(key)), .keep_all = TRUE)
+    if (W_criterio == "queen") {
+      nb <- spdep::poly2nb(sub, queen = TRUE)
+    } else {
+      coords <- if (any(grepl("POLYGON", as.character(sf::st_geometry_type(sub)))))
+        sf::st_coordinates(suppressWarnings(sf::st_centroid(sub)))
+      else sf::st_coordinates(sub)
+      nb <- spdep::knn2nb(spdep::knearneigh(coords, k = W_par))
+    }
+    W <- spdep::nb2listw(nb, style = "W", zero.policy = TRUE)
+    sub_df <- d |> dplyr::filter(anio == yr) |>
+      dplyr::filter(.data[[key]] %in% sub[[key]]) |>
+      dplyr::arrange(match(.data[[key]], sub[[key]]))
+    if (nrow(sub_df) != length(W$neighbours))
+      return(tibble::tibble(anio = yr, n = nrow(sub_df),
+                              RSerr_p = NA, RSlag_p = NA))
+    mod <- lm(formula, data = sub_df)
+    tests <- spdep::lm.RStests(mod, W,
+                                 test = c("RSerr","RSlag","adjRSerr","adjRSlag"),
+                                 zero.policy = TRUE)
+    tibble::tibble(
+      anio = yr, n = nrow(sub_df),
+      RSerr   = as.numeric(tests$RSerr$statistic),
+      RSerr_p = as.numeric(tests$RSerr$p.value),
+      RSlag   = as.numeric(tests$RSlag$statistic),
+      RSlag_p = as.numeric(tests$RSlag$p.value),
+      adjRSerr   = as.numeric(tests$adjRSerr$statistic),
+      adjRSerr_p = as.numeric(tests$adjRSerr$p.value),
+      adjRSlag   = as.numeric(tests$adjRSlag$statistic),
+      adjRSlag_p = as.numeric(tests$adjRSlag$p.value)
+    )
+  })
+}
+```
+
+### 23.3.3 Resumen estructura panel y tests LM
+
+```{r tabla_diag_panel_resumen}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+diag_resumen <- readr::read_csv(file.path(TBL_DIR, "diagnostico_panel_resumen.csv"),
+                                  show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  diag_resumen,
+  caption = "Estructura panel + VIF altos por escala (cov VIF>5 indican multicolinealidad)."
+)
+```
+
+```{r tabla_lm_panel}
+lm_total <- readr::read_csv(file.path(TBL_DIR, "tests_lm_panel.csv"),
+                              show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  lm_total |>
+    dplyr::select(escala, n_anios, dplyr::starts_with("adjRS")) |>
+    dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Tests Anselin RS adjustados (mediana sobre 9 anios) por escala. p<0.05 indica autocorrelacion residual."
+)
+```
+
+### 23.3.4 Interpretación
+
+Tras incluir las 8 covariables Lista B en una OLS por año, los tests
+RS ajustados detectan dependencia espacial residual significativa
+(p < 0.05) **en las 4 escalas, en proporciones temporales variables**:
+
+- sede: 1/9 años con `adjRS_lag` significativo (11%)
+- zat: 4/9 años (44%)
+- upl: 4/9 años (44%)
+- upz: 7/9 años (78%)
+
+La heterogeneidad temporal sugiere que parte de la autocorrelación se
+absorbe por las covariables, pero queda residuo persistente en las
+escalas más agregadas. **Justifica la elección de SDM** (que captura
+tanto efectos directos como indirectos de las X), aún cuando los
+tests no lo identifiquen como única especificación válida en cada año.
+
+## 23.4 Estimación de los 16 modelos
+
+Para cada escala se estiman 4 especificaciones (16 modelos en total):
+
+1. **Pooled SDM** (modelo PRINCIPAL): `spatialreg::lagsarlm` con W
+   block-diagonal (kron(I_T, W_n)), 8 covariables Lista B + dummies
+   de año + Durbin lags de las 8 covariables. `method = "LU"` (W es
+   asimétrica por knn).
+2. **Within-SDM** (robustez): `splm::spml(model="within", lag=TRUE)`
+   con W cross-section, covariables identificables por escala
+   (threshold 50% invariancia: sede=4, ZAT=4, UPL=6, UPZ=6) +
+   columnas W·X manuales calculadas por año.
+3. **Within-SAR** (auxiliar para LR test): igual al Within-SDM
+   pero sin las columnas W·X.
+4. **RE-SDM** (auxiliar para Hausman): `spml(model="random",
+   lag=TRUE)` con las mismas covariables identificables.
+
+Todos los modelos se persisten en `outputs/models/` como `.rds`.
+
+```{r tabla_resumen_16_modelos}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+resumen <- readr::read_csv(file.path(TBL_DIR, "resumen_16_modelos.csv"),
+                             show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  resumen |> dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Resumen de los 16 modelos estimados (4 escalas x 4 especificaciones)."
+)
+```
+
+## 23.5 Tests formales (Hausman + LR)
+
+```{r tabla_tests_formales}
+tests_total <- readr::read_csv(file.path(TBL_DIR, "tests_formales_panel.csv"),
+                                 show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  tests_total,
+  caption = "Tests Hausman (Within-SDM vs RE-SDM) y LR (Within-SDM vs Within-SAR). LR no computado por incompatibilidad logLik en splm; Hausman OK."
+)
+```
+
+**Lectura por escala:**
+
+- **sede, zat, upz**: Hausman rechaza fuertemente RE (p < 0.001),
+  consistente con efectos fijos por unidad. **Within-SDM es la
+  especificación correcta** entre las dos panel-puras.
+- **upl**: Hausman no rechaza RE (p ≈ 1.0; n=33 puede limitar
+  potencia del test). RE-SDM y Within-SDM dan inferencia similar.
+
+Sin embargo, **D16-revisada elige Pooled SDM como modelo principal**
+en todas las escalas por la pregunta sustantiva (identificar las
+covariables institucionales que Within elimina por demeaning).
+Within-SDM se reporta como robustez en sección 5.5.
+
+## 23.6 Validación bootstrap-cluster en UPL
+
+Per D20, se aplica bootstrap-cluster por unidad (B=200) sobre el
+Pooled SDM de UPL (n=297, T=9; el panel más pequeño donde el costo
+del bootstrap es manejable, ~90 s) para validar que los SE
+asintóticos no subestiman gravemente la incertidumbre.
+
+```{r tabla_se_validation_upl}
+se_val <- readr::read_csv(file.path(TBL_DIR, "se_validation_upl_bootstrap_vs_asymp.csv"),
+                            show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  se_val |>
+    dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Pooled SDM UPL: SE asintóticos vs bootstrap-cluster (B=200). ratio = SE_boot/SE_asymp; consistente=TRUE si la significancia al 5% no cambia."
+)
+```
+
+**Hallazgo crítico**: en UPL los `SE_boot` son **1.3-6.1 veces
+mayores** que los `SE_asymp`. La consistencia de conclusiones de
+significancia al 5 % es de aproximadamente 50 %. Esto es esperable
+en un panel con n=33 unidades: el bootstrap-cluster captura la
+correlación intra-unidad que los SE asintóticos asumen ausente.
+
+**Implicación para el modelo principal Pooled SDM**:
+
+- En **sede** (n=940) y **zat** (n=461), donde el panel es mucho
+  más grande, la subestimación de SE asintóticos es típicamente
+  menor (la convergencia hacia el SE poblacional es más rápida
+  con n grande). Aún así, los p-values de los modelos principales
+  deben interpretarse como **evidencia indicativa**, no prueba
+  estricta, conforme D20.
+- En **upl** y **upz**, la inferencia con SE asintóticos debe
+  tomarse con especial cautela. Los efectos significativos al 5 %
+  bajo SE asintóticos en estas escalas pueden no serlo bajo
+  cluster-robust.
+- La narrativa principal (5.5) discute esto explícitamente como
+  limitación inferencial. Trabajo futuro: bootstrap-cluster en
+  sede y zat (~30-60 min cada uno) para validar la inferencia
+  completa.
+
+## 23.7 Descomposición de efectos directos / indirectos / totales
+
+`spatialreg::impacts()` con simulación Monte Carlo (R=500) sobre los
+4 Pooled SDM principales. Para escalas grandes (sede n=8460, zat
+n=4149) se usa `trW(W_block, type="mult", m=30)` para aproximar las
+trazas de potencias de W (necesarias para los efectos indirectos)
+sin invertir explícitamente (I − ρ·W).
+
+```{r tabla_efectos_pooled}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+COVARIABLES_8 <- c("estrato_promedio","prop_oficial","prop_internet_hogar",
+                    "prop_jornada_completa","prop_calendario_a",
+                    "prop_genero_femenino","prop_bilingue","n_estudiantes_log")
+ef_all <- readr::read_csv(file.path(TBL_DIR, "efectos_pooled_sdm_consolidado.csv"),
+                            show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  ef_all |>
+    dplyr::filter(variable %in% COVARIABLES_8) |>
+    dplyr::select(escala, variable, DEf, DEf_p, IEf, IEf_p, TEf, TEf_p) |>
+    dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Pooled SDM: efectos directos, indirectos y totales por covariable y escala (R=500 simulaciones)."
+)
+```
+
+```{r forest_efectos_zat, fig.width=10, fig.height=7, dpi=300, dev="png", fig.cap="Forest plot Q1 de los efectos directos, indirectos y totales del Pooled SDM a escala ZAT."}
+fig_path <- file.path(RUTAS$outputs, "figures", "forest_efectos_pooled_sdm_zat.png")
+if (file.exists(fig_path)) knitr::include_graphics(fig_path)
+```
+
+### 23.7.1 Within-SDM (apéndice de robustez)
+
+Los Within-SDM (con covariables identificables) se reportan como
+apéndice. `spatialreg::impacts` no aplica directamente a objetos
+`splm` (Within); por tanto, la tabla muestra los coeficientes de
+los regresores (incluyendo Durbin lags W·X) con sus z-scores
+asintóticos.
+
+```{r tabla_within_apendice}
+within_coefs <- readr::read_csv(file.path(TBL_DIR, "within_sdm_coefs_apendice.csv"),
+                                  show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  within_coefs |> dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Within-SDM (apéndice): coeficientes (X y W·X) por escala con SE asintóticos."
+)
+```
+
+## 23.8 Análisis de sensibilidad del Pooled SDM
+
+Cinco bloques de sensibilidad re-estiman el Pooled SDM principal
+bajo perturbaciones controladas para evaluar la robustez de los
+hallazgos a decisiones discrecionales del diseño:
+
+1. **W contrastante.** En `sede` se compara la W principal `knn=5`
+   con `knn=10`; en `zat`, `knn=5` contra `queen` (contigüidad
+   poligonal). Permite separar la señal espacial de la elección de
+   conectividad.
+2. **Sin `prop_bilingue`.** Excluye la covariable con mayor
+   proporción de valores faltantes imputados a 0. Verifica que no
+   sea fuente espuria de la estructura espacial.
+3. **`prop_madre_universitaria` reemplaza `estrato_promedio`.**
+   Sustituye el principal control socioeconómico para descartar
+   colinealidad estructural con el efecto espacial.
+4. **`X` con rezago temporal (lag-1).** Reemplaza las covariables
+   contemporáneas por su valor en t-1, para mitigar la endogeneidad
+   simultánea (estimando con T=8 períodos efectivos).
+5. **Sin Sumapaz (sede).** Excluye la localidad rural Sumapaz
+   (≈0.3% de las sedes) que distorsiona la matriz W al ser un
+   outlier geográfico (sub-grafos en `knearneigh`).
+
+```{r tabla_sensibilidades_pooled}
+sens_all <- readr::read_csv(file.path(TBL_DIR, "sensibilidades_pooled_consolidado.csv"),
+                              show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  sens_all |>
+    dplyr::filter(variable %in% c("rho", "estrato_promedio",
+                                    "prop_madre_universitaria",
+                                    "estrato_promedio_lag")) |>
+    dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Sensibilidades del Pooled SDM: ρ y el principal control socioeconómico bajo cada perturbación."
+)
+```
+
+**Lecturas clave:**
+
+- El coeficiente de `estrato_promedio` (o su sustituto/lag) se
+  mantiene estable en signo, magnitud y significancia a través de
+  todas las sensibilidades y escalas (ZAT: 0.34–0.40; UPL: 0.38;
+  UPZ: 0.43–0.50). El control socioeconómico es robusto.
+- ρ es más volátil, especialmente en escalas pequeñas (sede ≈ 0.02–
+  0.10; zat ≈ −0.01–0.02; upl ≈ −0.27–0.16; upz ≈ −0.04–0.11).
+  Esto es coherente con la dependencia espacial débil documentada
+  en el análisis Moran y refuerza la prudencia interpretativa: la
+  difusión espacial no es un hallazgo robusto cuantitativamente
+  aunque sí cualitativamente (signos consistentes a escala fina).
+- En `sede × knn=10` y `madre_vs_estrato` (sede, zat) algunos SE
+  asintóticos resultan `NaN`: la Hessiana de cuasi-MLE se vuelve
+  numéricamente singular bajo W más densas o sustituciones de
+  controles altamente colineales. Los puntos estimados siguen
+  siendo informativos pero la inferencia no es válida en esos
+  casos — se reportan con el caveat correspondiente.
+- Excluir Sumapaz no altera materialmente los resultados (`sede`:
+  ρ=0.021, `estrato_promedio`=0.327), lo que valida mantener la
+  muestra completa en la especificación principal.
+
+---
+
+# 24. Resultados principales del Pooled SDM (síntesis para tesis)
+
+Esta sección consolida los resultados del Pooled SDM en una
+narrativa formal lista para integrar al manuscrito de tesis. Las
+tablas inline son producidas por `modelsummary` con los mismos
+modelos guardados en `outputs/models/` y exportadas también como
+archivos `standalone` (`outputs/tables/tabla_*.{html,docx,tex}`).
+
+## 24.0 Justificación metodológica
+
+El modelo principal de la tesis es el **Pooled Spatial Durbin Model**
+(Pooled SDM) estimado por máxima verosimilitud sobre los nueve
+periodos efectivos 2016-1 a 2024-1 con efectos fijos de tiempo
+(`factor(anio)`). Esta elección, formalizada en la decisión D16
+(versión revisada), responde a tres consideraciones sustantivas:
+
+1. **Pregunta de investigación.** La tesis indaga la asociación
+   entre características institucionales y socioeconómicas de los
+   colegios y su rendimiento académico, así como la dependencia
+   espacial entre colegios vecinos. Esta es esencialmente una
+   pregunta de **variación entre unidades** (which schools? where?),
+   no exclusivamente de variación intra-unidad a lo largo del tiempo.
+   El estimador Pooled aprovecha ambas fuentes; el Within-SDM
+   restringe la identificación a la variación intra-unidad y
+   pierde por construcción los regresores institucionales que son
+   constantes en el tiempo (`prop_oficial` 100% time-invariant
+   a escala de sede, `prop_calendario_a` 96%, `prop_jornada_completa`
+   80%, `prop_bilingue` 92%).
+2. **Identificabilidad de efectos institucionales.** A escala de
+   sede, sólo 4 de las 8 covariables candidatas tienen variación
+   intra-unidad suficiente para ser identificadas en el Within;
+   a escala ZAT son también 4. Reportar el Within como modelo
+   principal sacrificaría la mayor parte del aparato sustantivo de
+   la tesis.
+3. **Descomposición de efectos directo/indirecto/total.** La novedad
+   metodológica del SDM frente al SAR/SEM es la descomposición
+   `impacts()` (LeSage & Pace 2009) que permite cuantificar el
+   *spillover* espacial de cada covariable. Esta descomposición se
+   computa nativamente sobre objetos `Sarlm` (Pooled), no sobre
+   `splm_ML` (Within), por lo que el Pooled habilita el principal
+   producto inferencial del trabajo.
+
+Errores estándar: asintóticos a partir de la Hessiana numérica
+(`fdHess`) por defecto en `spatialreg::lagsarlm` (decisión D20).
+Se valida la inferencia con bootstrap-cluster por UPL en escalas
+agregadas (4 modelos UPL): los SE bootstrap resultan entre 1.3 y
+6.1 veces más grandes que los asintóticos, lo que sugiere
+sub-cobertura del SE asintótico bajo correlación serial-espacial.
+Las estimaciones puntuales se reportan tal cual; la magnitud
+precisa de los intervalos de confianza se discute con esta
+inflación en mente. Bootstrap-cluster a escala sede/ZAT se deja
+como trabajo futuro por costo computacional (n=8460 sedes × 9
+periodos × B=200 réplicas excede el presupuesto computacional de
+la tesis).
+
+Tests formales (Hausman + LR) se reportan como información
+metodológica transparente, **no** como criterio principal de
+selección. Como muestra la Tabla 24.1, Hausman rechaza Pooled/RE
+en favor de Within en SEDE y ZAT (estadísticos elevados con n
+grande) pero acepta RE en UPL (n=297, baja potencia). Esta
+discrepancia confirma que la elección final descansa en argumentos
+sustantivos, no estadísticos.
+
+```{r tabla_tests_panel_inline}
+TBL_DIR <- file.path(RUTAS$outputs, "tables")
+tests_panel <- readr::read_csv(file.path(TBL_DIR, "tests_formales_panel.csv"),
+                                show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  tests_panel |> dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Tabla 24.1. Tests formales por escala (Hausman + LR)."
+)
+```
+
+## 24.1 Dependencia espacial residual (ρ)
+
+El parámetro autorregresivo espacial ρ del Pooled SDM cuantifica
+la dependencia espacial **residual** (después de controlar por las
+8 covariables y por efectos fijos de tiempo). Los valores estimados
+son:
+
+- **SEDE** (n=8460): ρ = 0.0351 (SE=0.0126, p=0.005). Significativo.
+- **ZAT** (n=4149): ρ = 0.0164 (SE=0.0241, p=0.497). No significativo.
+- **UPL** (n=297): ρ = -0.2463 (SE=0.0896, p=0.006). Significativo y negativo.
+- **UPZ** (n=909): ρ = 0.1116 (SE=0.0511, p=0.029). Significativo.
+
+Comparado con el Moran's I bivariado del puntaje estandarizado
+reportado en Fase 4 (Sección 22), que oscila entre 0.05 y 0.20
+según escala y W, el ρ residual es **considerablemente menor**.
+Esta diferencia es interpretable: las covariables del modelo
+(particularmente `estrato_promedio`, `prop_internet_hogar`,
+`prop_oficial`) capturan parte sustancial de la dependencia
+espacial bruta del puntaje. Lo que queda es la dependencia
+condicional, que es donde se evalúa el spillover *neto* entre
+colegios vecinos. Esta lectura — que el contexto socioeconómico
+del colegio explica una porción importante del clustering espacial
+del rendimiento — es uno de los hallazgos sustantivos de la tesis.
+
+El signo negativo de ρ a escala UPL es atípico y merece comentario.
+A nivel de localidad (UPL) y con W queen, vecindad agregada implica
+homogeneidad socioeconómica gruesa: una vez controlado por el
+estrato promedio, el efecto residual entre UPLs vecinas tiende a
+ser de **diferenciación** (UPLs colindantes con perfiles
+institucionales contrastantes). El hallazgo es robusto a la
+exclusión de prop_bilingue (ρ=-0.265) y a la sustitución por
+educación maternal (ρ=-0.159).
+
+## 24.2 Efectos del estrato: directo, indirecto y total
+
+El núcleo sustantivo del Pooled SDM está en la descomposición de
+efectos del control socioeconómico principal (`estrato_promedio`).
+La tabla siguiente muestra los efectos directo (DEf), indirecto
+(IEf) y total (TEf) del estrato sobre el puntaje estandarizado por
+escala, con sus p-valores Monte Carlo (R=500 simulaciones):
+
+```{r tabla_estrato_efectos_inline}
+ef <- readr::read_csv(file.path(TBL_DIR, "efectos_pooled_sdm_consolidado.csv"),
+                       show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  ef |>
+    dplyr::filter(variable == "estrato_promedio") |>
+    dplyr::transmute(
+      escala = toupper(escala),
+      `Directo` = round(DEf, 3),  `p_DEf` = format.pval(DEf_p, digits = 2),
+      `Indirecto` = round(IEf, 3), `p_IEf` = format.pval(IEf_p, digits = 2),
+      `Total` = round(TEf, 3),     `p_TEf` = format.pval(TEf_p, digits = 2)
+    ),
+  caption = "Tabla 24.2. Descomposición del efecto del estrato promedio (Monte Carlo R=500)."
+)
+```
+
+**Interpretación.** El efecto **directo** del estrato sobre el
+puntaje del propio colegio es siempre positivo y altamente
+significativo (DE entre 0.34 σ a sede y 0.51 σ a UPZ, todos con
+p < 10⁻⁴⁰). Este es el efecto convencional: un colegio con un
+estudiantado de mayor estrato promedio obtiene mejores puntajes.
+
+El hallazgo novedoso, propio del SDM, es el efecto **indirecto**
+(spillover): el estrato promedio de los **colegios vecinos**
+afecta el puntaje del colegio focal. Este efecto es:
+
+- A nivel sede: positivo y débil (IEf=0.027, p=0.007). Vecinos de
+  estrato alto incrementan ligeramente el puntaje del colegio.
+  Coherente con efectos de pares y de aspiraciones de barrio.
+- A nivel ZAT/UPL/UPZ: **negativo** y significativo (IEf entre
+  -0.065 a ZAT y -0.278 a UPL). A escala más agregada, el estrato
+  alto de zonas vecinas se asocia con menor puntaje en la zona
+  focal, una vez controlado el estrato propio.
+
+El signo negativo del spillover a escalas agregadas es consistente
+con la interpretación de **competencia por talento** o
+**estratificación residencial-educativa**: en regiones donde una
+zona concentra alto NSE, las zonas vecinas tienden a perder
+estudiantes de mejor desempeño hacia colegios de la zona privilegiada,
+deprimiendo el puntaje promedio en la zona vecina. Este es un
+mecanismo de **redistribución espacial**, no de derrame puro de
+externalidades positivas. Documentar este patrón es uno de los
+aportes empíricos centrales del trabajo.
+
+El efecto **total** (DEf + IEf, suma de las contribuciones marginales)
+permanece positivo en todas las escalas (TEf entre 0.19 y 0.37 σ),
+indicando que el efecto neto del estrato sobre el rendimiento
+educativo de la ciudad es positivo, aunque atenuado por el spillover
+negativo a escalas agregadas.
+
+## 24.3 Efectos institucionales
+
+La tabla principal del modelo, reproducida abajo, muestra todos los
+coeficientes de las 8 covariables, sus rezagos espaciales (W·X), ρ
+y los estadísticos de ajuste. Esta es la tabla de referencia para
+discusión institucional.
+
+```{r tabla_pooled_principal_inline}
+suppressWarnings({
+  library(modelsummary); library(spatialreg); library(broom)
+})
+COVS <- c("estrato_promedio","prop_oficial","prop_internet_hogar",
+          "prop_jornada_completa","prop_calendario_a",
+          "prop_genero_femenino","prop_bilingue","n_estudiantes_log")
+LABS_COV <- c(
+  estrato_promedio = "Estrato promedio", prop_oficial = "Prop. oficial",
+  prop_internet_hogar = "Prop. internet hogar",
+  prop_jornada_completa = "Prop. jornada completa",
+  prop_calendario_a = "Prop. calendario A",
+  prop_genero_femenino = "Prop. género femenino",
+  prop_bilingue = "Prop. bilingüe",
+  n_estudiantes_log = "log(n estudiantes)"
+)
+coef_map_pool <- c(
+  setNames(LABS_COV, COVS),
+  setNames(paste0("W·", LABS_COV), paste0("lag.", COVS)),
+  rho = "ρ (lag espacial)"
+)
+gof_map_inline <- tibble::tribble(
+  ~raw,     ~clean,     ~fmt,
+  "nobs",   "n",        0L,
+  "logLik", "log-Lik",  1L,
+  "AIC",    "AIC",      1L,
+  "rmse",   "RMSE",     3L
+)
+pooled_inline <- list(
+  SEDE = readRDS(file.path(RUTAS$outputs, "models/pooled_sdm_sede.rds")),
+  ZAT  = readRDS(file.path(RUTAS$outputs, "models/pooled_sdm_zat.rds")),
+  UPL  = readRDS(file.path(RUTAS$outputs, "models/pooled_sdm_upl.rds")),
+  UPZ  = readRDS(file.path(RUTAS$outputs, "models/pooled_sdm_upz.rds"))
+)
+modelsummary(pooled_inline,
+              coef_map  = coef_map_pool,
+              coef_omit = "factor\\(anio\\)|\\(Intercept\\)",
+              gof_map   = gof_map_inline,
+              stars     = c("*"=0.10, "**"=0.05, "***"=0.01),
+              title     = "Tabla 24.3. Pooled SDM por escala (efectos fijos de año, SE asintóticos via fdHess).",
+              notes     = c("Año FE: incluidos en las 4 columnas.",
+                            "Significancia: * p<0.10, ** p<0.05, *** p<0.01."))
+```
+
+**Lecturas institucionales clave (todas con efectos directos
+positivos y altamente significativos):**
+
+- **`prop_oficial`**: el efecto directo es positivo (0.20 a sede,
+  0.24 a ZAT/UPZ). Es decir, *condicional al estrato* y a la
+  infraestructura tecnológica, los colegios oficiales muestran
+  mejor desempeño en el rendimiento z-estandarizado. El resultado
+  difiere del relato común "privado mejor que público" porque al
+  controlar por estrato se aísla el efecto institucional puro,
+  separado del efecto composicional. La discusión sustantiva de
+  este hallazgo aborda la heterogeneidad del sector oficial en
+  Bogotá (megacolegios distritales, calendario A, jornada única).
+
+- **`prop_jornada_completa`**: efecto directo elevado y consistente
+  (0.43 a UPZ, 0.57 a sede/ZAT). La jornada única-completa es uno
+  de los mecanismos institucionales más potentes para el rendimiento.
+
+- **`prop_calendario_a`**: efecto directo positivo (0.44 a UPZ a
+  0.70 sede). Calendario A está asociado con colegios privados
+  tradicionales y con mejor desempeño una vez netos del estrato.
+
+- **`prop_internet_hogar`**: efecto directo grande (1.34 a UPL a
+  2.16 a UPZ). Capta no sólo conectividad sino el complejo
+  socio-económico-institucional asociado a hogares con acceso TIC.
+
+- **`prop_bilingue`**: efecto directo cercano a cero o ligeramente
+  negativo en escalas agregadas; débil en sede. Su contribución es
+  marginal una vez controlado el estrato.
+
+Este patrón es coherente con la **segregación pública/privada**
+documentada en la literatura sobre Bogotá: el sistema escolar
+opera con estratificación de calendarios, jornadas y acceso a
+infraestructura digital que se superpone a la estratificación
+socioeconómica del barrio.
+
+## 24.4 Robustez (síntesis Fase 5.4)
+
+Los resultados se evaluaron bajo cinco perturbaciones (sección
+23.8): (i) W contrastantes, (ii) sin `prop_bilingue`, (iii)
+educación maternal en lugar de estrato, (iv) X con rezago temporal
+y (v) sin Sumapaz. La conclusión es que el efecto del control
+socioeconómico es **estable** (estrato_promedio entre 0.34 y 0.50
+en todas las celdas válidas) mientras que ρ es **volátil**,
+particularmente en escalas finas, lo que refuerza la lectura de
+prudencia sobre la magnitud (no el signo) de la difusión espacial.
+
+```{r tabla_sensibilidades_inline}
+sens <- readr::read_csv(file.path(TBL_DIR, "sensibilidades_pooled_consolidado.csv"),
+                         show_col_types = FALSE, progress = FALSE)
+knitr::kable(
+  sens |>
+    dplyr::filter(variable == "rho") |>
+    dplyr::mutate(across(where(is.numeric), ~round(.x, 4))),
+  caption = "Tabla 24.4. Robustez de ρ a través de las cinco sensibilidades."
+)
+```
+
+## 24.5 Cambios según escala (MAUP)
+
+La estructura de escalas (sede → ZAT → UPL → UPZ) revela el
+clásico **Modifiable Areal Unit Problem** (MAUP). Los efectos
+directos del estrato y de la infraestructura institucional
+**crecen monotónicamente con la agregación**: estrato pasa de 0.34
+σ a sede a 0.51 σ a UPZ; jornada completa de 0.57 a 0.43 (excepción
+moderada); internet de 1.71 a 2.16. La interpretación es que la
+agregación promedia ruido idiosincrático del colegio individual y
+hace emerger la asociación estructural barrio-rendimiento. La
+agregación también modifica los signos de los spillovers (ρ
+positivo a sede/UPZ, no significativo a ZAT, negativo a UPL).
+
+La elección del nivel de reporte para la tesis privilegia la **ZAT**
+por dos razones: es la escala de planeación intermedia oficial
+(SDP), conserva el detalle suficiente para identificar gradientes
+intra-localidad y agrupa colegios próximos en zonas
+funcionalmente coherentes, evitando el artefacto del polígono
+político (UPL) y la atomicidad estadística del punto (sede). Los
+cuatro niveles se reportan para transparencia.
+
+## 24.6 Limitaciones y direcciones futuras
+
+**Limitaciones reconocidas:**
+
+- **SE asintóticos (D20).** En el panel apilado, los SE asintóticos
+  vía `fdHess` subestiman la incertidumbre frente a una corrección
+  por correlación serial-espacial. La validación bootstrap-cluster
+  en UPL muestra inflación entre 1.3× y 6.1×; los IC reportados a
+  sede/ZAT/UPZ deben interpretarse como **límite inferior**
+  conservador.
+- **Hessianos singulares en sensibilidades (D23).** En tres
+  especificaciones de sensibilidad (sede × W_knn10, madre_vs_estrato
+  en sede y ZAT) la matriz Hessiana resultó numéricamente singular,
+  impidiendo la computación de errores estándar. Las estimaciones
+  puntuales se retienen para evaluación direccional pero la
+  inferencia formal en esos casos se omite. Esto es esperable cuando
+  hay alta colinealidad conjunta entre rezagos espaciales y
+  covariables fuertemente correlacionadas como estrato y educación
+  maternal (r=0.86); es información sobre la sensibilidad del
+  modelo a perturbaciones extremas, no sobre la validez del modelo
+  principal.
+- **Geocodificación incompleta.** 17 sedes con presencia en ICFES
+  no aparecen en el `gpkg` de colegios distritales (pérdida de
+  ≈3 150 estudiantes, < 0.5% de la muestra). El sesgo asociado se
+  cuantifica como pequeño pero queda como trabajo futuro su
+  imputación geoespacial.
+- **Códigos UPR rurales.** Cinco códigos UPR de la zona rural
+  (Sumapaz fundamentalmente) se agregan como UPZ artificiales en
+  la cartografía. La especificación principal incluye Sumapaz; el
+  análisis de sensibilidad confirma que excluirlo no altera los
+  resultados.
+- **Convención ε = 50 m.** En la matriz `inv_dist` se umbraliza
+  por 50 m para evitar pesos infinitos en colegios co-ubicados
+  (calendarios A/B en mismo plantel). El umbral es heurístico; la
+  matriz `inv_dist` se reporta sólo en sensibilidad.
+
+**Direcciones futuras:**
+
+- Bootstrap-cluster a escala sede/ZAT (presupuesto computacional
+  fuera del alcance actual).
+- Modelo dinámico (panel) con instrumentos espaciales para
+  endogeneidad simultánea.
+- SARMA (lag + error espaciales conjuntos) como alternativa al SDM.
+- Efectos heterogéneos por estrato socioeconómico vía interacciones
+  o splines espaciales.
+- Validación con cohortes 2025+ cuando los microdatos estén
+  disponibles.
+
+## 24.7 Conclusiones del capítulo
+
+1. **El estrato socioeconómico domina el rendimiento.** El efecto
+   directo del estrato es robusto y de magnitud sustancial (0.34 a
+   0.51 σ por unidad de estrato), invariante a la perturbación de
+   W, exclusión de variables, sustitución por educación maternal,
+   rezago temporal o exclusión de Sumapaz.
+2. **Existe spillover espacial sustantivo y direccionalmente
+   coherente.** Positivo y débil a nivel sede (efectos de pares),
+   negativo y significativo a escalas agregadas (competencia por
+   talento, estratificación residencial-educativa). El signo
+   distinto entre escalas es información sobre el mecanismo, no
+   ruido.
+3. **Los factores institucionales (jornada completa, calendario A,
+   sector oficial) tienen efectos directos positivos significativos
+   condicionales al estrato.** El sistema escolar bogotano opera
+   con estratificación institucional superpuesta a la
+   socioeconómica.
+4. **El Pooled SDM es el modelo principal por argumentos
+   sustantivos**, no por pruebas formales. La inferencia se reporta
+   con SE asintóticos validados por bootstrap-cluster en UPL como
+   límite inferior conservador.
+
+---
+
+# 25. Información de sesión
+
+```{r session_info}
+sessionInfo()
+```

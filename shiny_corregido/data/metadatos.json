@@ -1,0 +1,12 @@
+{
+  "generado": "2026-10-05 23:02:41",
+  "huella_parquet_validada": "e1e0c3dae4ba739f",
+  "sedes": 1224,
+  "examenes": 770319,
+  "sedes_media_suprimida": 12,
+  "n_minimo_divulgacion": 10,
+  "periodos": 18,
+  "catalog_vintage": "2025-06-30",
+  "alcance_supresion": "Se suprime la media (z_publicado) de las sedes con menos de 10 presentaciones en los nueve anos. Esas sedes conservan su clasificacion LISA, su conteo y su ubicacion: la supresion limita la divulgacion de un promedio, no convierte la entrega en anonima.",
+  "limitaciones": ["Geografia armonizada al catalogo de sedes de 2025 aplicado a resultados de 2016 a 2024. No es geocodificacion historica.", "Lo que se muestra son asociaciones espaciales y condicionales, no efectos causales.", "LISA usa el p analitico de localmoran() sin ajuste por comparaciones multiples: el mapa es exploratorio.", "El z se calcula contra la poblacion nacional de cada periodo, antes de filtrar Bogota.", "Las sedes con menos de 10 examenes no publican su media.", "La unidad es la presentacion del examen, no la persona."]
+}
